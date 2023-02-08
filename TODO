@@ -1,0 +1,9 @@
+- Tabbed UI
+- Delegation condition processing
+- Delegation tab
+- Import npub
+- Import nsec
+- Import mnemonic
+- Mnemonic support (generate, derive)
+- Store keys
+- Store keys encrypted
