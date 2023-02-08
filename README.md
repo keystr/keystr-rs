@@ -1,19 +1,20 @@
-= **Keystr**: Nostr Keystore
+# **Keystr**: Nostr Keystore
 
 An application for managing Nostr keys.
 Written in Rust, with simple UI (Iced).
 
-== Building and Running
+## Building and Running
 
 - Prerequisite: `rust`, >= 1.64
 
-- Run
+- Simply run
 ```
 cargo build && cargo run
 ```
 
+## License: MIT
 
-== References
+## References
 
 - Protocol definition  https://github.com/nostr-protocol/nostr  protocol
 
