@@ -13,6 +13,10 @@ impl Keystore {
         }
     }
 
+    pub fn get_keys(&self) -> Keys {
+        self.keys.clone()
+    }
+
     pub fn get_npub(&self) -> String {
         if !self.is_set {
             "(no keys set!)".to_string()
@@ -20,6 +24,20 @@ impl Keystore {
             match self.keys.public_key().to_bech32() {
                 Err(_) => "(conversion error)".to_string(),
                 Ok(s) => s,
+            }
+        }
+    }
+
+    pub fn get_nsec(&self) -> String {
+        if !self.is_set {
+            "(no keys set!)".to_string()
+        } else {
+            match self.keys.secret_key() {
+                Err(_) => "(no secret key)".to_string(),
+                Ok(key) => match key.to_bech32() {
+                    Err(_) => "(conversion error)".to_string(),
+                    Ok(s) => s,
+                },
             }
         }
     }

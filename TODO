@@ -1,4 +1,5 @@
-- Tabbed UI
+- use nostr crate only, not nostr-sdk
+- Hide nsec, show only on request, or copy
 - Delegation condition processing
 - Delegation tab
 - Import npub

@@ -1,13 +1,15 @@
-use crate::keystore::Keystore;
+use crate::{delegator::Delegator, keystore::Keystore};
 
 pub(crate) struct KeystrModel {
-    pub keystore: Keystore,
+    pub own_keys: Keystore,
+    pub delegator: Delegator,
 }
 
 impl KeystrModel {
     pub fn new() -> Self {
         KeystrModel {
-            keystore: Keystore::new(),
+            own_keys: Keystore::new(),
+            delegator: Delegator::new(),
         }
     }
 }
