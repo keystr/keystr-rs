@@ -177,4 +177,28 @@ mod test {
         );
         assert!(verify_result.is_ok());
     }
+
+    #[test]
+    fn test_time_set_start() {
+        let mut d = Delegator::new();
+        d.generate_random_delegatee();
+        d.time_set_start("1676067553");
+        assert_eq!(d.conditions, "created_at>1676067553");
+    }
+
+    #[test]
+    fn test_time_set_end() {
+        let mut d = Delegator::new();
+        d.generate_random_delegatee();
+        d.time_set_end("1678659553");
+        assert_eq!(d.conditions, "created_at<1678659553");
+    }
+
+    #[test]
+    fn test_time_set_days() {
+        let mut d = Delegator::new();
+        d.generate_random_delegatee();
+        d.time_set_days("11");
+        assert_eq!(d.time_cond_end.parse::<i64>().unwrap() - d.time_cond_start.parse::<i64>().unwrap(), 11 * 24 * 60 * 60);
+    }
 }
