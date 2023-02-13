@@ -1,10 +1,10 @@
 - use nostr crate only, not nostr-sdk
 - Hide nsec, show only on request, or copy
-- Delegation condition processing
 - Delegation tab
 - Import npub
 - Import nsec
 - Import mnemonic
+- Multiple identities (main, etc.)
 - Mnemonic support (generate, derive)
 - Store keys
 - Store keys encrypted

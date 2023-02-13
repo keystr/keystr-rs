@@ -181,23 +181,26 @@ mod test {
     #[test]
     fn test_time_set_start() {
         let mut d = Delegator::new();
-        d.generate_random_delegatee();
+        d.delegatee_npub =
+            "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_start("1676067553");
-        assert_eq!(d.conditions, "created_at>1676067553");
+        assert_eq!(d.delegation_string, "nostr:delegation:bea8aeb6c1657e33db5ac75a83910f77e8ec6145157e476b5b88c6e85b1fab34:created_at>1676067553");
     }
 
     #[test]
     fn test_time_set_end() {
         let mut d = Delegator::new();
-        d.generate_random_delegatee();
+        d.delegatee_npub =
+            "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_end("1678659553");
-        assert_eq!(d.conditions, "created_at<1678659553");
+        assert_eq!(d.delegation_string, "nostr:delegation:bea8aeb6c1657e33db5ac75a83910f77e8ec6145157e476b5b88c6e85b1fab34:created_at<1678659553");
     }
 
     #[test]
     fn test_time_set_days() {
         let mut d = Delegator::new();
-        d.generate_random_delegatee();
+        d.delegatee_npub =
+            "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_days("11");
         assert_eq!(d.time_cond_end.parse::<i64>().unwrap() - d.time_cond_start.parse::<i64>().unwrap(), 11 * 24 * 60 * 60);
     }
