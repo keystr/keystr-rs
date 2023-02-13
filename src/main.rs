@@ -1,7 +1,7 @@
 mod delegator;
-mod event_filter;
 mod keystore;
 mod keystr_model;
+//mod kind_filter;
 mod ui_iced;
 
 use crate::ui_iced::KeystrApp;

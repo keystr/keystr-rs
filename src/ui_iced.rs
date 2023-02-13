@@ -15,7 +15,12 @@ pub enum Message {
     KeysGenerate,
     DelegateDeeChanged(String),
     DelegateDeeGenerate,
-    DelegateDeeSign,
+    DelegateSign,
+    DelegateKindChanged(String),
+    DelegateTimeStartChanged(String),
+    DelegateTimeEndChanged(String),
+    DelegateTimeDaysChanged(String),
+    DelegateTimeDaysChangedNoUpdate(String),
     ChangedDummy(String),
 }
 
@@ -56,8 +61,10 @@ impl KeystrApp {
             .size(15),
             button("Generate new").on_press(Message::KeysGenerate),
         ]
-        .padding(20)
         .align_items(Alignment::Fill)
+        .spacing(5)
+        .padding(20)
+        .max_width(500)
         .into()
     }
 
@@ -65,14 +72,56 @@ impl KeystrApp {
         column![
             text("Delegate").size(25),
             text("Delegatee -- npub to delegate to:").size(15),
+            row![
+                text_input(
+                    "delegatee npub",
+                    &self.model.delegator.delegatee_npub,
+                    Message::DelegateDeeChanged,
+                )
+                .size(15),
+                button("Generate new").on_press(Message::DelegateDeeGenerate),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5),
+            iced::widget::rule::Rule::horizontal(5),
+            text("Event kinds (eg. 'k=1'):").size(15),
             text_input(
-                "delegatee npub",
-                &self.model.delegator.delegatee_npub,
-                Message::DelegateDeeChanged,
+                "kind condition",
+                &self.model.delegator.kind_condition,
+                Message::DelegateKindChanged,
             )
             .size(15),
-            button("Generate new").on_press(Message::DelegateDeeGenerate),
-            button("Sign").on_press(Message::DelegateDeeSign),
+            iced::widget::rule::Rule::horizontal(5),
+            text("Time start:").size(15),
+            text_input(
+                "time start",
+                &self.model.delegator.time_cond_start,
+                Message::DelegateTimeStartChanged,
+            )
+            .size(15),
+            text("Time end:").size(15),
+            text_input(
+                "time end",
+                &self.model.delegator.time_cond_end,
+                Message::DelegateTimeEndChanged,
+            )
+            .size(15),
+            text("Time days:").size(15),
+            row![
+                text_input(
+                    "time duration in days",
+                    &self.model.delegator.time_cond_days,
+                    Message::DelegateTimeDaysChangedNoUpdate,
+                )
+                .size(15),
+                button("Set").on_press(Message::DelegateTimeDaysChanged(
+                    self.model.delegator.time_cond_days.clone()
+                )),
+            ]
+            .align_items(Alignment::Start)
+            .spacing(5),
+            iced::widget::rule::Rule::horizontal(5),
+            button("Sign").on_press(Message::DelegateSign),
             text("Signature:").size(15),
             text_input(
                 "signature",
@@ -80,9 +129,25 @@ impl KeystrApp {
                 Message::ChangedDummy,
             )
             .size(15),
+            text("Conditions:").size(15),
+            text_input(
+                "conditions",
+                &self.model.delegator.conditions,
+                Message::ChangedDummy,
+            )
+            .size(15),
+            text("Delegation string:").size(15),
+            text_input(
+                "delegation string",
+                &self.model.delegator.delegation_string,
+                Message::ChangedDummy,
+            )
+            .size(15),
         ]
-        .padding(20)
         .align_items(Alignment::Fill)
+        .spacing(5)
+        .padding(20)
+        .max_width(500)
         .into()
     }
 
@@ -126,10 +191,26 @@ impl Sandbox for KeystrApp {
             Message::KeysGenerate => self.model.own_keys.generate(),
             Message::DelegateDeeChanged(s) => {
                 self.model.delegator.delegatee_npub = s;
-                self.model.delegator.validate_input();
+                let _r = self.model.delegator.validate_and_update();
             }
             Message::DelegateDeeGenerate => self.model.delegator.generate_random_delegatee(),
-            Message::DelegateDeeSign => {
+            Message::DelegateKindChanged(s) => {
+                self.model.delegator.kind_condition = s;
+                let _r = self.model.delegator.validate_and_update();
+            }
+            Message::DelegateTimeStartChanged(s) => {
+                self.model.delegator.time_set_start(&s);
+            }
+            Message::DelegateTimeEndChanged(s) => {
+                self.model.delegator.time_set_end(&s);
+            }
+            Message::DelegateTimeDaysChanged(s) => {
+                self.model.delegator.time_set_days(&s);
+            }
+            Message::DelegateTimeDaysChangedNoUpdate(s) => {
+                self.model.delegator.time_cond_days = s;
+            }
+            Message::DelegateSign => {
                 let _r = self.model.delegator.sign(&self.model.own_keys.get_keys());
             }
             Message::ChangedDummy(_s) => {}
