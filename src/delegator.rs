@@ -107,16 +107,20 @@ impl Delegator {
         let _r = self.validate_and_update();
     }
 
-    pub fn compile_delegation_tag(&self, multiline: bool) -> String {
+    pub fn compile_delegation_tag(&self, delegator_pubkey: &XOnlyPublicKey, multiline: bool) -> Result<String, String> {
+        let delegator_npub = match delegator_pubkey.to_bech32() {
+            Err(e) => return Err(e.to_string()),
+            Ok(s) => s,
+        };
         let separator = if multiline { "\n" } else { " " };
         let tabulator = if multiline { "\t" } else { "" };
-        format!(
+        Ok(format!(
             "[{}{}\"delegation\",{}{}\"{}\",{}{}\"{}\",{}{}\"{}\"{}]",
             separator,
             tabulator,
             separator,
             tabulator,
-            self.delegatee_npub,
+            delegator_npub,
             separator,
             tabulator,
             self.conditions,
@@ -124,7 +128,7 @@ impl Delegator {
             tabulator,
             self.signature,
             separator
-        )
+        ))
     }
 
     /// Create signature. Delegatee pubkey and conditions are taken from self.
@@ -137,7 +141,7 @@ impl Delegator {
             Ok(s) => s,
         };
         self.signature = sig.to_string();
-        self.delegation_tag = self.compile_delegation_tag(false);
+        self.delegation_tag = self.compile_delegation_tag(&keys.public_key(), false)?;
         Ok(())
     }
 }
@@ -235,14 +239,19 @@ mod test {
 
     #[test]
     fn test_compile_delegation_tag() {
+        let sk = SecretKey::from_bech32(
+            "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae",
+        )
+        .unwrap();
+        let keys = Keys::new(sk);
         let mut d = Delegator::new();
         d.delegatee_npub =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.conditions = "k=1&reated_at<1678659553".to_string();
         d.signature = "435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976".to_string();
-        let tag = d.compile_delegation_tag(true);
-        assert_eq!(tag, "[\n\t\"delegation\",\n\t\"npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez\",\n\t\"k=1&reated_at<1678659553\",\n\t\"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\"\n]");
-        let tag = d.compile_delegation_tag(false);
-        assert_eq!(tag, "[ \"delegation\", \"npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez\", \"k=1&reated_at<1678659553\", \"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\" ]");
+        let tag = d.compile_delegation_tag(&keys.public_key(), true).unwrap();
+        assert_eq!(tag, "[\n\t\"delegation\",\n\t\"npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4\",\n\t\"k=1&reated_at<1678659553\",\n\t\"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\"\n]");
+        let tag = d.compile_delegation_tag(&keys.public_key(), false).unwrap();
+        assert_eq!(tag, "[ \"delegation\", \"npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4\", \"k=1&reated_at<1678659553\", \"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\" ]");
     }
 }
