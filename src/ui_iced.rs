@@ -1,7 +1,7 @@
 use crate::keystr_model::KeystrModel;
 
 use iced::widget::{button, column, row, text, text_input};
-use iced::{Alignment, Element, Sandbox};
+use iced::{Alignment, Element, Length, Sandbox};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -21,7 +21,7 @@ pub enum Message {
     DelegateTimeEndChanged(String),
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
-    ChangedDummy(String),
+    ChangedReadonly(String),
 }
 
 pub(crate) struct KeystrApp {
@@ -49,14 +49,14 @@ impl KeystrApp {
             text_input(
                 "npub public key",
                 &self.model.own_keys.get_npub(),
-                Message::ChangedDummy,
+                Message::ChangedReadonly,
             )
             .size(15),
             text("Secret key (nsec) TODO hide:").size(15),
             text_input(
                 "nsec secret key",
                 &self.model.own_keys.get_nsec(),
-                Message::ChangedDummy,
+                Message::ChangedReadonly,
             )
             .size(15),
             button("Generate new").on_press(Message::KeysGenerate),
@@ -64,11 +64,12 @@ impl KeystrApp {
         .align_items(Alignment::Fill)
         .spacing(5)
         .padding(20)
-        .max_width(500)
+        .max_width(600)
         .into()
     }
 
     fn tab_delegate(&self) -> Element<Message> {
+        let label_width = Length::Units(150);
         column![
             text("Delegate").size(25),
             text("Delegatee -- npub to delegate to:").size(15),
@@ -84,30 +85,57 @@ impl KeystrApp {
             .align_items(Alignment::Fill)
             .spacing(5),
             iced::widget::rule::Rule::horizontal(5),
-            text("Event kinds (eg. 'k=1'):").size(15),
-            text_input(
-                "kind condition",
-                &self.model.delegator.kind_condition,
-                Message::DelegateKindChanged,
-            )
-            .size(15),
-            iced::widget::rule::Rule::horizontal(5),
-            text("Time start:").size(15),
-            text_input(
-                "time start",
-                &self.model.delegator.time_cond_start,
-                Message::DelegateTimeStartChanged,
-            )
-            .size(15),
-            text("Time end:").size(15),
-            text_input(
-                "time end",
-                &self.model.delegator.time_cond_end,
-                Message::DelegateTimeEndChanged,
-            )
-            .size(15),
-            text("Time days:").size(15),
             row![
+                column![text("Event kinds (eg. 'k=1'):").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "kind condition",
+                    &self.model.delegator.kind_condition,
+                    Message::DelegateKindChanged,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
+            row![
+                column![text("Time start:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "time start",
+                    &self.model.delegator.time_cond_start,
+                    Message::DelegateTimeStartChanged,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            row![
+                column![text("Time end:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "time end",
+                    &self.model.delegator.time_cond_end,
+                    Message::DelegateTimeEndChanged,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            row![
+                column![text("Time days:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
                 text_input(
                     "time duration in days",
                     &self.model.delegator.time_cond_days,
@@ -118,36 +146,70 @@ impl KeystrApp {
                     self.model.delegator.time_cond_days.clone()
                 )),
             ]
-            .align_items(Alignment::Start)
-            .spacing(5),
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
+            row![
+                column![text("Condition string:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "conditions",
+                    &self.model.delegator.conditions,
+                    Message::ChangedReadonly,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            row![
+                column![text("Delegation string:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "delegation string",
+                    &self.model.delegator.delegation_string,
+                    Message::ChangedReadonly,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
             iced::widget::rule::Rule::horizontal(5),
             button("Sign").on_press(Message::DelegateSign),
-            text("Signature:").size(15),
+            row![
+                column![text("Signature:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "signature",
+                    &self.model.delegator.signature,
+                    Message::ChangedReadonly,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
+            text("Delegation tag:").size(15),
             text_input(
-                "signature",
-                &self.model.delegator.signature,
-                Message::ChangedDummy,
-            )
-            .size(15),
-            text("Conditions:").size(15),
-            text_input(
-                "conditions",
-                &self.model.delegator.conditions,
-                Message::ChangedDummy,
-            )
-            .size(15),
-            text("Delegation string:").size(15),
-            text_input(
-                "delegation string",
-                &self.model.delegator.delegation_string,
-                Message::ChangedDummy,
+                "delegation tag",
+                &self.model.delegator.delegation_tag,
+                Message::ChangedReadonly,
             )
             .size(15),
         ]
         .align_items(Alignment::Fill)
         .spacing(5)
         .padding(20)
-        .max_width(500)
+        .max_width(600)
         .into()
     }
 
@@ -213,7 +275,7 @@ impl Sandbox for KeystrApp {
             Message::DelegateSign => {
                 let _r = self.model.delegator.sign(&self.model.own_keys.get_keys());
             }
-            Message::ChangedDummy(_s) => {}
+            Message::ChangedReadonly(_s) => {}
         }
     }
 

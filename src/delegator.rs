@@ -20,6 +20,8 @@ pub(crate) struct Delegator {
     pub delegation_string: String,
     // Resulting signature
     pub signature: String,
+    // Compiled delegation tag (contains pubkey, conditions, signature)
+    pub delegation_tag: String,
 }
 
 impl Delegator {
@@ -33,6 +35,7 @@ impl Delegator {
             conditions: String::new(),
             delegation_string: String::new(),
             signature: String::new(),
+            delegation_tag: String::new(),
         };
         let _r = d.validate_and_update();
         d
@@ -104,8 +107,29 @@ impl Delegator {
         let _r = self.validate_and_update();
     }
 
-    /// Delegatee and conditions are taken from self
-    pub fn sign(&mut self, keys: &Keys) -> Result<String, String> {
+    pub fn compile_delegation_tag(&self, multiline: bool) -> String {
+        let separator = if multiline { "\n" } else { " " };
+        let tabulator = if multiline { "\t" } else { "" };
+        format!(
+            "[{}{}\"delegation\",{}{}\"{}\",{}{}\"{}\",{}{}\"{}\"{}]",
+            separator,
+            tabulator,
+            separator,
+            tabulator,
+            self.delegatee_npub,
+            separator,
+            tabulator,
+            self.conditions,
+            separator,
+            tabulator,
+            self.signature,
+            separator
+        )
+    }
+
+    /// Create signature. Delegatee pubkey and conditions are taken from self.
+    /// Result signature and also updated delegation tag are places in self.
+    pub fn sign(&mut self, keys: &Keys) -> Result<(), String> {
         self.validate_and_update()?;
         let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub.clone()).unwrap(); // TODO handle error
         let sig = match sign_delegation(keys, delegatee_key, self.conditions.clone()) {
@@ -113,7 +137,8 @@ impl Delegator {
             Ok(s) => s,
         };
         self.signature = sig.to_string();
-        Ok(self.signature.to_string())
+        self.delegation_tag = self.compile_delegation_tag(false);
+        Ok(())
     }
 }
 
@@ -158,7 +183,7 @@ mod test {
         d.kind_condition = "k=1".to_string();
         d.time_cond_start = 1676067553.to_string();
         d.time_cond_end = 1678659553.to_string();
-        let sig = d.sign(&keys).unwrap();
+        let _res = d.sign(&keys).unwrap();
 
         // signature is changing, validate by verify (Note: some internals of sign are reproduced here; sdk should have a verify)
         let delegatee_key = XOnlyPublicKey::from_bech32(d.delegatee_npub.clone()).unwrap();
@@ -171,7 +196,7 @@ mod test {
         let message = Message::from_slice(&hashed_token).unwrap();
         let secp = Secp256k1::new();
         let verify_result = secp.verify_schnorr(
-            &Signature::from_str(&sig).unwrap(),
+            &Signature::from_str(&d.signature).unwrap(),
             &message,
             &keys.public_key(),
         );
@@ -202,6 +227,22 @@ mod test {
         d.delegatee_npub =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_days("11");
-        assert_eq!(d.time_cond_end.parse::<i64>().unwrap() - d.time_cond_start.parse::<i64>().unwrap(), 11 * 24 * 60 * 60);
+        assert_eq!(
+            d.time_cond_end.parse::<i64>().unwrap() - d.time_cond_start.parse::<i64>().unwrap(),
+            11 * 24 * 60 * 60
+        );
+    }
+
+    #[test]
+    fn test_compile_delegation_tag() {
+        let mut d = Delegator::new();
+        d.delegatee_npub =
+            "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
+        d.conditions = "k=1&reated_at<1678659553".to_string();
+        d.signature = "435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976".to_string();
+        let tag = d.compile_delegation_tag(true);
+        assert_eq!(tag, "[\n\t\"delegation\",\n\t\"npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez\",\n\t\"k=1&reated_at<1678659553\",\n\t\"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\"\n]");
+        let tag = d.compile_delegation_tag(false);
+        assert_eq!(tag, "[ \"delegation\", \"npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez\", \"k=1&reated_at<1678659553\", \"435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976\" ]");
     }
 }
