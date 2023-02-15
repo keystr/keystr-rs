@@ -13,6 +13,10 @@ pub enum Tab {
 pub enum Message {
     TabSelect(Tab),
     KeysGenerate,
+    KeysPubkeyInput(String),
+    KeysPubkeyImport,
+    KeysSecretkeyInput(String),
+    KeysSecretkeyImport,
     DelegateDeeChanged(String),
     DelegateDeeGenerate,
     DelegateSign,
@@ -60,6 +64,30 @@ impl KeystrApp {
             )
             .size(15),
             button("Generate new").on_press(Message::KeysGenerate),
+            row![
+                text_input(
+                    "npub or hex for public key import",
+                    &self.model.own_keys.public_key_input,
+                    Message::KeysPubkeyInput,
+                )
+                .size(15),
+                button("Import Public key").on_press(Message::KeysPubkeyImport),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            row![
+                text_input(
+                    "npub or hex for secret key import",
+                    &self.model.own_keys.secret_key_input,
+                    Message::KeysSecretkeyInput,
+                )
+                .size(15),
+                button("Import Secret key").on_press(Message::KeysSecretkeyImport),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
         ]
         .align_items(Alignment::Fill)
         .spacing(5)
@@ -76,7 +104,7 @@ impl KeystrApp {
             row![
                 text_input(
                     "delegatee npub",
-                    &self.model.delegator.delegatee_npub,
+                    &self.model.delegator.delegatee_npub_input,
                     Message::DelegateDeeChanged,
                 )
                 .size(15),
@@ -92,7 +120,7 @@ impl KeystrApp {
                     .padding(0),
                 text_input(
                     "kind condition",
-                    &self.model.delegator.kind_condition,
+                    &self.model.delegator.kind_condition_input,
                     Message::DelegateKindChanged,
                 )
                 .size(15),
@@ -251,13 +279,33 @@ impl Sandbox for KeystrApp {
                 self.current_tab = t;
             }
             Message::KeysGenerate => self.model.own_keys.generate(),
+            Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
+            Message::KeysPubkeyImport => {
+                // TODO error handling
+                let _res = self
+                    .model
+                    .own_keys
+                    .import_public_key(&self.model.own_keys.public_key_input.clone());
+                // cleanup
+                self.model.own_keys.public_key_input = String::new();
+            }
+            Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
+            Message::KeysSecretkeyImport => {
+                // TODO error handling
+                let _res = self
+                    .model
+                    .own_keys
+                    .import_secret_key(&self.model.own_keys.secret_key_input.clone());
+                // cleanup
+                self.model.own_keys.secret_key_input = String::new();
+            }
             Message::DelegateDeeChanged(s) => {
-                self.model.delegator.delegatee_npub = s;
+                self.model.delegator.delegatee_npub_input = s;
                 let _r = self.model.delegator.validate_and_update();
             }
             Message::DelegateDeeGenerate => self.model.delegator.generate_random_delegatee(),
             Message::DelegateKindChanged(s) => {
-                self.model.delegator.kind_condition = s;
+                self.model.delegator.kind_condition_input = s;
                 let _r = self.model.delegator.validate_and_update();
             }
             Message::DelegateTimeStartChanged(s) => {

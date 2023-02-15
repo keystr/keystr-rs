@@ -5,9 +5,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Model for Delegator
 pub(crate) struct Delegator {
     // Input for delegatee
-    pub delegatee_npub: String,
+    pub delegatee_npub_input: String,
     // Kind condition (direct input TODO)
-    pub kind_condition: String,
+    pub kind_condition_input: String,
     // Validity start time, can be empty
     pub time_cond_start: String,
     // Validity end time, can be empty
@@ -27,8 +27,8 @@ pub(crate) struct Delegator {
 impl Delegator {
     pub fn new() -> Self {
         let mut d = Delegator {
-            delegatee_npub: String::new(),
-            kind_condition: String::new(),
+            delegatee_npub_input: String::new(),
+            kind_condition_input: String::new(),
             time_cond_start: String::new(),
             time_cond_end: String::new(),
             time_cond_days: "90".to_string(),
@@ -43,8 +43,8 @@ impl Delegator {
 
     pub fn validate_and_update(&mut self) -> Result<(), String> {
         let mut cond = Vec::new();
-        if self.kind_condition.len() > 0 {
-            cond.push(self.kind_condition.clone());
+        if self.kind_condition_input.len() > 0 {
+            cond.push(self.kind_condition_input.clone());
         }
         if self.time_cond_start.len() > 0 {
             cond.push(format!("created_at>{}", self.time_cond_start));
@@ -54,7 +54,7 @@ impl Delegator {
         }
         self.conditions = cond.join("&");
 
-        let delegatee_key = match XOnlyPublicKey::from_bech32(self.delegatee_npub.clone()) {
+        let delegatee_key = match XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone()) {
             Err(e) => return Err(e.to_string()),
             Ok(k) => k,
         };
@@ -103,7 +103,7 @@ impl Delegator {
 
     pub fn generate_random_delegatee(&mut self) {
         let key = Keys::generate().public_key();
-        self.delegatee_npub = key.to_bech32().unwrap();
+        self.delegatee_npub_input = key.to_bech32().unwrap();
         let _r = self.validate_and_update();
     }
 
@@ -139,7 +139,7 @@ impl Delegator {
     /// Result signature and also updated delegation tag are places in self.
     pub fn sign(&mut self, keys: &Keys) -> Result<(), String> {
         self.validate_and_update()?;
-        let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub.clone()).unwrap(); // TODO handle error
+        let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone()).unwrap(); // TODO handle error
         let sig = match sign_delegation(keys, delegatee_key, self.conditions.clone()) {
             Err(e) => return Err(e.to_string()),
             Ok(s) => s,
@@ -186,15 +186,15 @@ mod test {
         let keys = Keys::new(sk);
 
         let mut d = Delegator::new();
-        d.delegatee_npub =
+        d.delegatee_npub_input =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
-        d.kind_condition = "k=1".to_string();
+        d.kind_condition_input = "k=1".to_string();
         d.time_cond_start = 1676067553.to_string();
         d.time_cond_end = 1678659553.to_string();
         let _res = d.sign(&keys).unwrap();
 
         // signature is changing, validate by verify (Note: some internals of sign are reproduced here; sdk should have a verify)
-        let delegatee_key = XOnlyPublicKey::from_bech32(d.delegatee_npub.clone()).unwrap();
+        let delegatee_key = XOnlyPublicKey::from_bech32(d.delegatee_npub_input.clone()).unwrap();
         let unhashed_token: String = format!("nostr:delegation:{}:{}", delegatee_key, d.conditions);
         assert_eq!(
             unhashed_token,
@@ -214,7 +214,7 @@ mod test {
     #[test]
     fn test_time_set_start() {
         let mut d = Delegator::new();
-        d.delegatee_npub =
+        d.delegatee_npub_input =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_start("1676067553");
         assert_eq!(d.delegation_string, "nostr:delegation:bea8aeb6c1657e33db5ac75a83910f77e8ec6145157e476b5b88c6e85b1fab34:created_at>1676067553");
@@ -223,7 +223,7 @@ mod test {
     #[test]
     fn test_time_set_end() {
         let mut d = Delegator::new();
-        d.delegatee_npub =
+        d.delegatee_npub_input =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_end("1678659553");
         assert_eq!(d.delegation_string, "nostr:delegation:bea8aeb6c1657e33db5ac75a83910f77e8ec6145157e476b5b88c6e85b1fab34:created_at<1678659553");
@@ -232,7 +232,7 @@ mod test {
     #[test]
     fn test_time_set_days() {
         let mut d = Delegator::new();
-        d.delegatee_npub =
+        d.delegatee_npub_input =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.time_set_days("11");
         assert_eq!(
@@ -249,7 +249,7 @@ mod test {
         .unwrap();
         let keys = Keys::new(sk);
         let mut d = Delegator::new();
-        d.delegatee_npub =
+        d.delegatee_npub_input =
             "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
         d.conditions = "k=1&reated_at<1678659553".to_string();
         d.signature = "435091ab4c4a11e594b1a05e0fa6c2f6e3b6eaa87c53f2981a3d6980858c40fdcaffde9a4c461f352a109402a4278ff4dbf90f9ebd05f96dac5ae36a6364a976".to_string();
