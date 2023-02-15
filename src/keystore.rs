@@ -167,9 +167,23 @@ mod test {
             k.get_npub(),
             "npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4"
         );
+    }
 
-        let res2 = k.import_secret_key("__NOT_A_VALID_KEY__");
-        assert!(res2.is_err());
+    #[test]
+    fn test_import_secret_key_hex() {
+        let mut k = Keystore::new();
+        let _res = k.import_secret_key("b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17").unwrap();
+        assert_eq!(
+            k.get_nsec(),
+            "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"
+        );
+    }
+
+    #[test]
+    fn test_import_secret_key_hex_invalid() {
+        let mut k = Keystore::new();
+        let res = k.import_secret_key("__NOT_A_VALID_KEY__");
+        assert!(res.is_err());
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
     }
@@ -186,9 +200,25 @@ mod test {
             k.get_npub(),
             "npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4"
         );
+    }
 
-        let res2 = k.import_public_key("__NOT_A_VALID_KEY__");
-        assert!(res2.is_err());
+    #[test]
+    fn test_import_public_key_hex() {
+        let mut k = Keystore::new();
+        let _res = k
+            .import_public_key("1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4")
+            .unwrap();
+        assert_eq!(
+            k.get_npub(),
+            "npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4"
+        );
+    }
+
+    #[test]
+    fn test_import_public_key_invalid() {
+        let mut k = Keystore::new();
+        let res = k.import_public_key("__NOT_A_VALID_KEY__");
+        assert!(res.is_err());
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
     }

@@ -62,8 +62,9 @@ impl KeystrApp {
                 &self.model.own_keys.get_nsec(),
                 Message::ChangedReadonly,
             )
+            .password()
             .size(15),
-            button("Generate new").on_press(Message::KeysGenerate),
+            button("Generate new keypair").on_press(Message::KeysGenerate),
             row![
                 text_input(
                     "npub or hex for public key import",
