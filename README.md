@@ -3,6 +3,16 @@
 An application for managing Nostr keys.
 Written in Rust, with simple UI (Iced).
 
+## Features
+
+- Key management:
+  - Import of keys
+- Delegations: Create delegation
+
+## Screenshot
+
+<img src="media/screenshot-01-deleg.png" align="center" title="screenshot delegation">
+
 ## Roadmap
 
 - Safekeeping of keys
