@@ -20,6 +20,9 @@ jobs:
       with:
         workspaces: |
           rust
-    - name: Building
+    - name: Build
       run: |
-        cargo build
+        cargo build --verbose
+    - name: Running tests
+      run: |
+        cargo test --verbose
