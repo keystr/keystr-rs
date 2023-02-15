@@ -107,7 +107,11 @@ impl Delegator {
         let _r = self.validate_and_update();
     }
 
-    pub fn compile_delegation_tag(&self, delegator_pubkey: &XOnlyPublicKey, multiline: bool) -> Result<String, String> {
+    pub fn compile_delegation_tag(
+        &self,
+        delegator_pubkey: &XOnlyPublicKey,
+        multiline: bool,
+    ) -> Result<String, String> {
         let delegator_npub = match delegator_pubkey.to_bech32() {
             Err(e) => return Err(e.to_string()),
             Ok(s) => s,

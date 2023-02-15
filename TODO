@@ -1,6 +1,6 @@
 - use nostr crate only, not nostr-sdk
+- UI: status msgs, error msgs
 - Hide nsec, show only on request, or copy
-- Delegation tab
 - Import npub
 - Import nsec
 - Import mnemonic

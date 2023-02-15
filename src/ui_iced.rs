@@ -198,7 +198,7 @@ impl KeystrApp {
             .spacing(5)
             .padding(0),
             iced::widget::rule::Rule::horizontal(5),
-            text("Delegation tag:").size(15),
+            text("Delegation tag -- Copy this:").size(15),
             text_input(
                 "delegation tag",
                 &self.model.delegator.delegation_tag,
@@ -273,7 +273,12 @@ impl Sandbox for KeystrApp {
                 self.model.delegator.time_cond_days = s;
             }
             Message::DelegateSign => {
-                let _r = self.model.delegator.sign(&self.model.own_keys.get_keys());
+                match self.model.own_keys.get_keys() {
+                    Err(_) => {} // TODO handle error
+                    Ok(keys) => {
+                        let _r = self.model.delegator.sign(&keys);
+                    }
+                };
             }
             Message::ChangedReadonly(_s) => {}
         }
