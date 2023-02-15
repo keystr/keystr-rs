@@ -11,7 +11,7 @@ Written in Rust, with simple UI (Iced).
 
 ## Screenshot
 
-<img src="media/screenshot-01-deleg.png" align="center" title="screenshot delegation">
+<img src="media/screenshot-01-deleg.png" align="center" title="screenshot delegation" border="1">
 
 ## Roadmap
 
@@ -25,6 +25,14 @@ Written in Rust, with simple UI (Iced).
 - Prerequisite: `rust`, >= 1.64
 
 - Simply run:  `cargo run`
+
+### Running Tests
+
+- `cargo tests`
+
+## Contributing
+
+Create an issue, PR, or discussion.
 
 ## License: MIT
 
