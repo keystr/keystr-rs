@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 iced = "0.7.0"
 nostr-sdk = "0.18.0"
+thiserror = "1.0"

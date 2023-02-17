@@ -1,9 +1,25 @@
 use nostr_sdk::prelude::schnorr::Signature;
+//use nostr_sdk::nostr::nips::nip26::Error;
 use nostr_sdk::prelude::{
     sha256, sign_delegation, Hash, Keys, Message, Secp256k1, ToBech32, XOnlyPublicKey,
 };
+//use nostr_sdk::nostr::secp256k1::Error;
+//use nostr_sdk::prelude::error::Error;
 
 // Ideally functionality here should come from a library, such as rust-nostr/nostr
+
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum Error {
+    /// Secp256k1 error
+    #[error(transparent)]
+    Secp256k1(#[from] nostr_sdk::nostr::secp256k1::Error),
+    /// Nip19 error
+    #[error(transparent)]
+    SignatureError(#[from] nostr_sdk::nostr::nips::nip19::Error),
+    /// Nip26 error
+    #[error(transparent)]
+    Nip26Error(#[from] nostr_sdk::nostr::nips::nip26::Error),
+}
 
 fn delegation_token(delegatee_pk: &XOnlyPublicKey, conditions: &str) -> String {
     format!("nostr:delegation:{delegatee_pk}:{conditions}")
@@ -15,18 +31,13 @@ pub fn verify_delegation_signature(
     signature: &Signature,
     delegatee_pk: XOnlyPublicKey,
     conditions: String,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     let secp = Secp256k1::new();
     let unhashed_token: String = delegation_token(&delegatee_pk, &conditions);
     let hashed_token = sha256::Hash::hash(unhashed_token.as_bytes());
-    let message = match Message::from_slice(&hashed_token) {
-        Err(e) => return Err(e.to_string()),
-        Ok(m) => m,
-    };
-    match secp.verify_schnorr(signature, &message, &keys.public_key()) {
-        Err(e) => Err(e.to_string()),
-        Ok(_) => Ok(()),
-    }
+    let message = Message::from_slice(&hashed_token)?;
+    secp.verify_schnorr(signature, &message, &keys.public_key())?;
+    Ok(())
 }
 
 /*
@@ -55,11 +66,8 @@ impl DelegationTag {
 
     // TODO from_string()
 
-    pub(crate) fn to_json(&self, multiline: bool) -> Result<String, String> {
-        let delegator_npub = match self.delegator_pubkey.to_bech32() {
-            Err(e) => return Err(e.to_string()),
-            Ok(s) => s,
-        };
+    pub(crate) fn to_json(&self, multiline: bool) -> Result<String, Error> {
+        let delegator_npub = self.delegator_pubkey.to_bech32()?;
         let separator = if multiline { "\n" } else { " " };
         let tabulator = if multiline { "\t" } else { "" };
         Ok(format!(
@@ -84,12 +92,8 @@ pub fn create_delegation_tag(
     delegator_keys: &Keys,
     delegatee_pubkey: XOnlyPublicKey,
     conditions_string: &String,
-) -> Result<DelegationTag, String> {
-    let signature =
-        match sign_delegation(delegator_keys, delegatee_pubkey, conditions_string.clone()) {
-            Err(e) => return Err(e.to_string()),
-            Ok(s) => s,
-        };
+) -> Result<DelegationTag, Error> {
+    let signature = sign_delegation(delegator_keys, delegatee_pubkey, conditions_string.clone())?;
     Ok(DelegationTag {
         delegator_pubkey: delegator_keys.public_key(),
         conditions: conditions_string.clone(),
