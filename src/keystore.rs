@@ -1,3 +1,4 @@
+use crate::error::Error;
 use nostr_sdk::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
 
 #[derive(PartialEq)]
@@ -39,36 +40,20 @@ impl Keystore {
     }
 
     /// Import public key only, in 'npub' bech32 or hex format. Signing will not be possible.
-    pub fn import_public_key(&mut self, public_key_str: &str) -> Result<(), String> {
-        match Keys::from_pk_str(public_key_str) {
-            Err(e) => {
-                self.clear();
-                Err(e.to_string())
-            }
-            Ok(k) => {
-                self.clear();
-                self.keys = k;
-                self.set_level = KeysSetState::PublicOnly;
-                Ok(())
-            }
-        }
+    pub fn import_public_key(&mut self, public_key_str: &str) -> Result<(), Error> {
+        self.clear();
+        self.keys = Keys::from_pk_str(public_key_str)?;
+        self.set_level = KeysSetState::PublicOnly;
+        Ok(())
     }
 
     /// Warning: Security-sensitive method!
     /// Import secret key, in 'nsec' bech32 or hex format (pubkey is derived from it)
-    pub fn import_secret_key(&mut self, secret_key_str: &str) -> Result<(), String> {
-        match Keys::from_sk_str(secret_key_str) {
-            Err(e) => {
-                self.clear();
-                Err(e.to_string())
-            }
-            Ok(k) => {
-                self.clear();
-                self.keys = k;
-                self.set_level = KeysSetState::SecretAndPublic;
-                Ok(())
-            }
-        }
+    pub fn import_secret_key(&mut self, secret_key_str: &str) -> Result<(), Error> {
+        self.clear();
+        self.keys = Keys::from_sk_str(secret_key_str)?;
+        self.set_level = KeysSetState::SecretAndPublic;
+        Ok(())
     }
 
     pub fn is_public_key_set(&self) -> bool {
@@ -79,9 +64,9 @@ impl Keystore {
         self.set_level == KeysSetState::SecretAndPublic
     }
 
-    pub fn get_keys(&self) -> Result<Keys, String> {
+    pub fn get_keys(&self) -> Result<Keys, Error> {
         if !self.is_secret_key_set() {
-            return Err("(not set)".to_string());
+            return Err(Error::KeyNotSet);
         }
         Ok(self.keys.clone())
     }

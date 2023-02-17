@@ -1,5 +1,6 @@
 - use nostr crate only, not nostr-sdk
 - UI: status msgs, error msgs
+- Setting for security level (OK save, OK ask, never)
 - Own error enum (instead of string)
 - Make Copy button work (copy to clipboard)
 - Hide nsec, show only on request, or copy

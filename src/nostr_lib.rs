@@ -1,10 +1,7 @@
 use nostr_sdk::prelude::schnorr::Signature;
-//use nostr_sdk::nostr::nips::nip26::Error;
 use nostr_sdk::prelude::{
     sha256, sign_delegation, Hash, Keys, Message, Secp256k1, ToBech32, XOnlyPublicKey,
 };
-//use nostr_sdk::nostr::secp256k1::Error;
-//use nostr_sdk::prelude::error::Error;
 
 // Ideally functionality here should come from a library, such as rust-nostr/nostr
 

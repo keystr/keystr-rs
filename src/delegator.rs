@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::nostr_lib::create_delegation_tag;
 
 use nostr_sdk::prelude::{sign_delegation, FromBech32, Keys, ToBech32, XOnlyPublicKey};
@@ -43,7 +44,7 @@ impl Delegator {
         d
     }
 
-    pub fn validate_and_update(&mut self) -> Result<(), String> {
+    pub fn validate_and_update(&mut self) -> Result<(), Error> {
         let mut cond = Vec::new();
         if self.kind_condition_input.len() > 0 {
             cond.push(self.kind_condition_input.clone());
@@ -56,10 +57,7 @@ impl Delegator {
         }
         self.conditions = cond.join("&");
 
-        let delegatee_key = match XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone()) {
-            Err(e) => return Err(e.to_string()),
-            Ok(k) => k,
-        };
+        let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone())?;
 
         // TODO: should come form SDK
         self.delegation_string = format!(
@@ -111,19 +109,13 @@ impl Delegator {
 
     /// Create delegation tag (incl. signature). Delegatee pubkey and conditions are taken from self.
     /// Result signature and also updated delegation tag are places in self.
-    pub fn create_delegation(&mut self, keys: &Keys) -> Result<(), String> {
+    pub fn create_delegation(&mut self, keys: &Keys) -> Result<(), Error> {
         self.validate_and_update()?;
         let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone()).unwrap(); // TODO handle error
-        let sig = match sign_delegation(keys, delegatee_key, self.conditions.clone()) {
-            Err(e) => return Err(e.to_string()),
-            Ok(s) => s,
-        };
+        let sig = sign_delegation(keys, delegatee_key, self.conditions.clone())?;
         self.signature = sig.to_string();
 
-        let tag = match create_delegation_tag(&keys, delegatee_key, &self.conditions.clone()) {
-            Err(e) => return Err(e.to_string()),
-            Ok(tag) => tag,
-        };
+        let tag = create_delegation_tag(&keys, delegatee_key, &self.conditions.clone())?;
         self.delegation_tag = tag.to_string();
         self.signature = tag.get_signature().to_string();
         Ok(())

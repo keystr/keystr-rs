@@ -1,4 +1,5 @@
 mod delegator;
+mod error;
 mod keystore;
 mod keystr_model;
 //mod kind_filter;
