@@ -325,7 +325,7 @@ impl Sandbox for KeystrApp {
                 match self.model.own_keys.get_keys() {
                     Err(_) => {} // TODO handle error
                     Ok(keys) => {
-                        let _r = self.model.delegator.sign(&keys);
+                        let _r = self.model.delegator.create_delegation(&keys);
                     }
                 };
             }

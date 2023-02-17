@@ -172,7 +172,9 @@ mod test {
     #[test]
     fn test_import_secret_key_hex() {
         let mut k = Keystore::new();
-        let _res = k.import_secret_key("b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17").unwrap();
+        let _res = k
+            .import_secret_key("b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17")
+            .unwrap();
         assert_eq!(
             k.get_nsec(),
             "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"

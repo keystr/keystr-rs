@@ -1,10 +1,12 @@
 - use nostr crate only, not nostr-sdk
 - UI: status msgs, error msgs
 - Own error enum (instead of string)
+- Make Copy button work (copy to clipboard)
 - Hide nsec, show only on request, or copy
 - Import npub
 - Import nsec
 - Import mnemonic
+- Code org: move module part to separate module (later separate crate)
 - Multiple identities (main, etc.)
 - Mnemonic support (generate, derive)
 - Store keys
