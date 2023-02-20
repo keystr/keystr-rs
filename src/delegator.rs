@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::nostr_lib::create_delegation_tag;
+use crate::nostr_lib::{create_delegation_tag, delegation_token};
 
 use nostr::prelude::{sign_delegation, FromBech32, Keys, ToBech32, XOnlyPublicKey};
 
@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub(crate) struct Delegator {
     // Input for delegatee
     pub delegatee_npub_input: String,
-    // Kind condition (direct input TODO)
+    // Kind condition
     pub kind_condition_input: String,
     // Validity start time, can be empty
     pub time_cond_start: String,
@@ -59,12 +59,7 @@ impl Delegator {
 
         let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone())?;
 
-        // TODO: should come form SDK
-        self.delegation_string = format!(
-            "nostr:delegation:{}:{}",
-            delegatee_key.to_string(),
-            self.conditions
-        );
+        self.delegation_string = delegation_token(&delegatee_key, &self.conditions);
         Ok(())
     }
 
@@ -111,7 +106,7 @@ impl Delegator {
     /// Result signature and also updated delegation tag are places in self.
     pub fn create_delegation(&mut self, keys: &Keys) -> Result<(), Error> {
         self.validate_and_update()?;
-        let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone()).unwrap(); // TODO handle error
+        let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone())?;
         let sig = sign_delegation(keys, delegatee_key, self.conditions.clone())?;
         self.signature = sig.to_string();
 

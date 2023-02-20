@@ -92,11 +92,12 @@ pub fn validate_delegation_tag(
 
 const DELEGATION_KEYWORD: &str = "delegation";
 
-/*
-fn delegation_token(delegatee_pk: &XOnlyPublicKey, conditions: &str) -> String {
+/// Compile the delegation token, of the form 'nostr:delegation:<pubkey of publisher (delegatee)>:<conditions query string>'
+pub fn delegation_token(delegatee_pk: &XOnlyPublicKey, conditions: &str) -> String {
     format!("nostr:{DELEGATION_KEYWORD}:{delegatee_pk}:{conditions}")
 }
 
+/*
 /// Verify delegation signature
 pub fn verify_delegation_signature(
     delegator_public_key: &XOnlyPublicKey,

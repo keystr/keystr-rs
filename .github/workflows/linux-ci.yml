@@ -22,7 +22,7 @@ jobs:
           rust
     - name: Build
       run: |
-        cargo build --verbose
+        cargo build
     - name: Running tests
       run: |
-        cargo test --verbose
+        cargo test

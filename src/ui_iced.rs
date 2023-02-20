@@ -56,7 +56,7 @@ impl KeystrApp {
                 Message::ChangedReadonly,
             )
             .size(15),
-            text("Secret key (nsec) TODO hide:").size(15),
+            text("Secret key (nsec):").size(15),
             text_input(
                 "nsec secret key",
                 &self.model.own_keys.get_nsec(),
