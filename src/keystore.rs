@@ -1,5 +1,5 @@
 use crate::error::Error;
-use nostr_sdk::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
+use nostr::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
 
 #[derive(PartialEq)]
 pub enum KeysSetState {

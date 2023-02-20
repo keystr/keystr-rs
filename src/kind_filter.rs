@@ -1,4 +1,4 @@
-use nostr_sdk::prelude::Kind;
+use nostr::prelude::Kind;
 
 // Filter for kinds (event types): all or some specific values
 pub(crate) struct KindFilter {

@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::nostr_lib::create_delegation_tag;
 
-use nostr_sdk::prelude::{sign_delegation, FromBech32, Keys, ToBech32, XOnlyPublicKey};
+use nostr::prelude::{sign_delegation, FromBech32, Keys, ToBech32, XOnlyPublicKey};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -126,8 +126,8 @@ impl Delegator {
 mod test {
     use super::*;
     use crate::nostr_lib::verify_delegation_signature;
-    use nostr_sdk::prelude::schnorr::Signature;
-    use nostr_sdk::prelude::SecretKey;
+    use nostr::prelude::schnorr::Signature;
+    use nostr::prelude::SecretKey;
     use std::str::FromStr;
 
     #[test]

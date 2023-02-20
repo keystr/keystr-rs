@@ -1,4 +1,3 @@
-- use nostr crate only, not nostr-sdk
 - UI: status msgs, error msgs
 - Setting for security level (OK save, OK ask, never)
 - Own error enum (instead of string)

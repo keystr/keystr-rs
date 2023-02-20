@@ -44,6 +44,6 @@ Create an issue, PR, or discussion.
 
 - NIP-26 Delegations  https://github.com/nostr-protocol/nips/blob/master/26.md
 
-- Nostr SDK  https://github.com/rust-nostr/nostr/tree/master/crates/nostr-sdk
+- Rust-nostr lib  https://github.com/rust-nostr/nostr
 
 - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool

@@ -1,5 +1,5 @@
-use nostr_sdk::prelude::schnorr::Signature;
-use nostr_sdk::prelude::{
+use nostr::prelude::schnorr::Signature;
+use nostr::prelude::{
     sha256, sign_delegation, Hash, Keys, Message, Secp256k1, ToBech32, XOnlyPublicKey,
 };
 
@@ -9,13 +9,13 @@ use nostr_sdk::prelude::{
 pub enum Error {
     /// Secp256k1 error
     #[error(transparent)]
-    Secp256k1(#[from] nostr_sdk::nostr::secp256k1::Error),
+    Secp256k1(#[from] nostr::secp256k1::Error),
     /// Nip19 error
     #[error(transparent)]
-    SignatureError(#[from] nostr_sdk::nostr::nips::nip19::Error),
+    SignatureError(#[from] nostr::nips::nip19::Error),
     /// Nip26 error
     #[error(transparent)]
-    Nip26Error(#[from] nostr_sdk::nostr::nips::nip26::Error),
+    Nip26Error(#[from] nostr::nips::nip26::Error),
 }
 
 fn delegation_token(delegatee_pk: &XOnlyPublicKey, conditions: &str) -> String {
@@ -111,7 +111,7 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
-    use nostr_sdk::prelude::{FromBech32, Keys, SecretKey};
+    use nostr::prelude::{FromBech32, Keys, SecretKey};
 
     #[test]
     fn test_delegation_tag_to_json() {
