@@ -115,7 +115,7 @@ impl KeystrApp {
             .spacing(5),
             iced::widget::rule::Rule::horizontal(5),
             row![
-                column![text("Event kinds (eg. 'k=1'):").size(15),]
+                column![text("Event kinds (eg. 'kind=1'):").size(15),]
                     .align_items(Alignment::Start)
                     .width(label_width)
                     .padding(0),

@@ -1,4 +1,4 @@
-#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     // Key not set (secret key or public key)
     #[error("key is not set")]
