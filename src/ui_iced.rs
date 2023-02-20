@@ -286,24 +286,26 @@ impl Sandbox for KeystrApp {
             Message::KeysGenerate => self.model.own_keys.generate(),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
             Message::KeysPubkeyImport => {
-                if let Err(e) = self
+                match self
                     .model
                     .own_keys
                     .import_public_key(&self.model.own_keys.public_key_input.clone())
                 {
-                    self.model.set_error_status(&e.to_string());
+                    Err(e) => self.model.set_error_status(&e.to_string()),
+                    Ok(_) => self.model.set_status("Public key imported"),
                 };
                 // cleanup
                 self.model.own_keys.public_key_input = String::new();
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
             Message::KeysSecretkeyImport => {
-                if let Err(e) = self
+                match self
                     .model
                     .own_keys
                     .import_secret_key(&self.model.own_keys.secret_key_input.clone())
                 {
-                    self.model.set_error_status(&e.to_string());
+                    Err(e) => self.model.set_error_status(&e.to_string()),
+                    Ok(_) => self.model.set_status("Secret key imported"),
                 };
                 // cleanup
                 self.model.own_keys.secret_key_input = String::new();
@@ -336,11 +338,10 @@ impl Sandbox for KeystrApp {
             Message::DelegateSign => {
                 match self.model.own_keys.get_keys() {
                     Err(e) => self.model.set_error_status(&e.to_string()),
-                    Ok(keys) => {
-                        if let Err(e) = self.model.delegator.create_delegation(&keys) {
-                            self.model.set_error_status(&e.to_string());
-                        }
-                    }
+                    Ok(keys) => match self.model.delegator.create_delegation(&keys) {
+                        Err(e) => self.model.set_error_status(&e.to_string()),
+                        Ok(_) => self.model.set_status("Delegation created"),
+                    },
                 };
             }
             Message::ChangedReadonly(_s) => {}

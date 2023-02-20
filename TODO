@@ -1,7 +1,5 @@
 - Setting for security level (OK save, OK ask, never)
 - Make Copy button work (copy to clipboard)
-- Import npub
-- Import nsec
 - Import mnemonic
 - Code org: move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
