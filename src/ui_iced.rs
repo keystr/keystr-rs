@@ -210,7 +210,7 @@ impl KeystrApp {
             .spacing(5)
             .padding(0),
             iced::widget::rule::Rule::horizontal(5),
-            button("Sign").on_press(Message::DelegateSign),
+            button("Create Delegation").on_press(Message::DelegateSign),
             row![
                 column![text("Signature:").size(15),]
                     .align_items(Alignment::Start)
@@ -248,6 +248,8 @@ impl KeystrApp {
             iced::widget::rule::Rule::horizontal(5),
             self.tab_selector(),
             iced::widget::rule::Rule::horizontal(5),
+            text_input("status", &self.model.status_line, Message::ChangedReadonly,).size(15),
+            iced::widget::rule::Rule::horizontal(5),
             match self.current_tab {
                 Tab::Keys => self.tab_keys(),
                 Tab::Delegate => self.tab_delegate(),
@@ -264,10 +266,12 @@ impl Sandbox for KeystrApp {
     type Message = Message;
 
     fn new() -> Self {
-        KeystrApp {
+        let mut app = KeystrApp {
             model: KeystrModel::new(),
             current_tab: Tab::Keys,
-        }
+        };
+        app.model.set_status("Keystr started");
+        app
     }
 
     fn title(&self) -> String {
@@ -282,32 +286,40 @@ impl Sandbox for KeystrApp {
             Message::KeysGenerate => self.model.own_keys.generate(),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
             Message::KeysPubkeyImport => {
-                // TODO error handling
-                let _res = self
+                if let Err(e) = self
                     .model
                     .own_keys
-                    .import_public_key(&self.model.own_keys.public_key_input.clone());
+                    .import_public_key(&self.model.own_keys.public_key_input.clone())
+                {
+                    self.model.set_error_status(&e.to_string());
+                };
                 // cleanup
                 self.model.own_keys.public_key_input = String::new();
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
             Message::KeysSecretkeyImport => {
-                // TODO error handling
-                let _res = self
+                if let Err(e) = self
                     .model
                     .own_keys
-                    .import_secret_key(&self.model.own_keys.secret_key_input.clone());
+                    .import_secret_key(&self.model.own_keys.secret_key_input.clone())
+                {
+                    self.model.set_error_status(&e.to_string());
+                };
                 // cleanup
                 self.model.own_keys.secret_key_input = String::new();
             }
             Message::DelegateDeeChanged(s) => {
                 self.model.delegator.delegatee_npub_input = s;
-                let _r = self.model.delegator.validate_and_update();
+                if let Err(e) = self.model.delegator.validate_and_update() {
+                    self.model.set_error_status(&e.to_string());
+                }
             }
             Message::DelegateDeeGenerate => self.model.delegator.generate_random_delegatee(),
             Message::DelegateKindChanged(s) => {
                 self.model.delegator.kind_condition_input = s;
-                let _r = self.model.delegator.validate_and_update();
+                if let Err(e) = self.model.delegator.validate_and_update() {
+                    self.model.set_error_status(&e.to_string());
+                }
             }
             Message::DelegateTimeStartChanged(s) => {
                 self.model.delegator.time_set_start(&s);
@@ -323,9 +335,11 @@ impl Sandbox for KeystrApp {
             }
             Message::DelegateSign => {
                 match self.model.own_keys.get_keys() {
-                    Err(_) => {} // TODO handle error
+                    Err(e) => self.model.set_error_status(&e.to_string()),
                     Ok(keys) => {
-                        let _r = self.model.delegator.create_delegation(&keys);
+                        if let Err(e) = self.model.delegator.create_delegation(&keys) {
+                            self.model.set_error_status(&e.to_string());
+                        }
                     }
                 };
             }

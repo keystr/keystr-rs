@@ -361,6 +361,9 @@ impl FromStr for Conditions {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 0 {
+            return Ok(Conditions { cond: Vec::new() });
+        }
         let cond = s
             .split('&')
             .map(Condition::from_str)
@@ -694,6 +697,9 @@ mod test {
             c.to_string(),
             "kind=1&created_at>1674834236&created_at<1677426236"
         );
+
+        let c_empty = Conditions::from_str("").unwrap();
+        assert_eq!(c_empty.to_string(), "");
     }
 
     #[test]
