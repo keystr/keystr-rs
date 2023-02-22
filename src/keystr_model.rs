@@ -46,9 +46,13 @@ impl StatusMessages {
         self.set(&format!("Error: {}!", s.to_string()));
     }
 
-    pub fn get_last(&self) -> String { self.get_last_n(1) }
+    pub fn get_last(&self) -> String {
+        self.get_last_n(1)
+    }
 
-    pub fn get_butlast(&self) -> String { self.get_last_n(2) }
+    pub fn get_butlast(&self) -> String {
+        self.get_last_n(2)
+    }
 
     fn get_last_n(&self, n: usize) -> String {
         if self.status_lines.len() < n {

@@ -67,8 +67,8 @@ impl KeystrApp {
             .password()
             .size(15),
             row![
-                button("Clear keys").on_press(Message::KeysClear),
                 button("Generate new keypair").on_press(Message::KeysGenerate),
+                button("Clear keys").on_press(Message::KeysClear),
             ]
             .align_items(Alignment::Fill)
             .spacing(5)
