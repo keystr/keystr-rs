@@ -1,8 +1,9 @@
 - Setting for security level (OK save, OK ask, never)
+- Store keys
+- Store keys encrypted
+- Show QR code for keys (pub)
 - Make Copy button work (copy to clipboard)
 - Import mnemonic
 - Code org: move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
-- Store keys
-- Store keys encrypted
 - Multiple identities (main, etc.)

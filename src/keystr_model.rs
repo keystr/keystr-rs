@@ -4,6 +4,7 @@ pub(crate) struct KeystrModel {
     pub own_keys: Keystore,
     pub delegator: Delegator,
     pub status: StatusMessages,
+    pub acknowledge_security_warning: bool,
 }
 
 impl KeystrModel {
@@ -12,7 +13,12 @@ impl KeystrModel {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
             status: StatusMessages::new(),
+            acknowledge_security_warning: false,
         }
+    }
+
+    pub fn get_security_warning_secret(&self) -> String {
+        "I understand that if the little secret key leaks to the wrong hands,\n the entire identity is COMPROMISED irreversibly!".to_string()
     }
 }
 

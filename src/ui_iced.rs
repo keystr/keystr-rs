@@ -1,6 +1,6 @@
 use crate::keystr_model::KeystrModel;
 
-use iced::widget::{button, column, row, text, text_input};
+use iced::widget::{button, checkbox, column, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +25,7 @@ pub enum Message {
     DelegateTimeEndChanged(String),
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
+    SecurityAcknowledge(bool),
     ChangedReadonly(String),
 }
 
@@ -83,6 +84,7 @@ impl KeystrApp {
                     &self.model.own_keys.secret_key_input,
                     Message::KeysSecretkeyInput,
                 )
+                .password()
                 .size(15),
                 button("Import Secret key").on_press(Message::KeysSecretkeyImport),
             ]
@@ -246,6 +248,8 @@ impl KeystrApp {
         column![
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
+            checkbox(&self.model.get_security_warning_secret(), self.model.acknowledge_security_warning, Message::SecurityAcknowledge).text_size(15),
+            iced::widget::rule::Rule::horizontal(5),
             self.tab_selector(),
             iced::widget::rule::Rule::horizontal(5),
             text(&format!("| {}", &self.model.status.get_butlast())).size(15),
@@ -303,16 +307,20 @@ impl Sandbox for KeystrApp {
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
             Message::KeysSecretkeyImport => {
-                match self
-                    .model
-                    .own_keys
-                    .import_secret_key(&self.model.own_keys.secret_key_input.clone())
-                {
-                    Err(e) => self.model.status.set_error(&e.to_string()),
-                    Ok(_) => self.model.status.set("Secret key imported"),
-                };
-                // cleanup
-                self.model.own_keys.secret_key_input = String::new();
+                if !self.model.acknowledge_security_warning {
+                    self.model.status.set_error("Need to accept security warning!");
+                } else {
+                    match self
+                        .model
+                        .own_keys
+                        .import_secret_key(&self.model.own_keys.secret_key_input.clone())
+                    {
+                        Err(e) => self.model.status.set_error(&e.to_string()),
+                        Ok(_) => self.model.status.set("Secret key imported"),
+                    };
+                    // cleanup
+                    self.model.own_keys.secret_key_input = String::new();
+                }
             }
             Message::DelegateDeeChanged(s) => {
                 self.model.delegator.delegatee_npub_input = s;
@@ -348,6 +356,7 @@ impl Sandbox for KeystrApp {
                     },
                 };
             }
+            Message::SecurityAcknowledge(b) => self.model.acknowledge_security_warning = b,
             Message::ChangedReadonly(_s) => {}
         }
     }
