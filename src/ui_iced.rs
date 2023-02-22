@@ -12,6 +12,7 @@ pub enum Tab {
 #[derive(Debug, Clone)]
 pub enum Message {
     TabSelect(Tab),
+    KeysClear,
     KeysGenerate,
     KeysPubkeyInput(String),
     KeysPubkeyImport,
@@ -65,7 +66,13 @@ impl KeystrApp {
             )
             .password()
             .size(15),
-            button("Generate new keypair").on_press(Message::KeysGenerate),
+            row![
+                button("Clear keys").on_press(Message::KeysClear),
+                button("Generate new keypair").on_press(Message::KeysGenerate),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
             row![
                 text_input(
                     "npub or hex for public key import",
@@ -248,7 +255,12 @@ impl KeystrApp {
         column![
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
-            checkbox(&self.model.get_security_warning_secret(), self.model.acknowledge_security_warning, Message::SecurityAcknowledge).text_size(15),
+            checkbox(
+                &self.model.get_security_warning_secret(),
+                self.model.acknowledge_security_warning,
+                Message::SecurityAcknowledge
+            )
+            .text_size(15),
             iced::widget::rule::Rule::horizontal(5),
             self.tab_selector(),
             iced::widget::rule::Rule::horizontal(5),
@@ -288,7 +300,13 @@ impl Sandbox for KeystrApp {
             Message::TabSelect(t) => {
                 self.current_tab = t;
             }
+            Message::KeysClear => {
+                // TODO confirmation
+                self.model.own_keys.clear();
+                self.model.status.set("Keys cleared");
+            }
             Message::KeysGenerate => {
+                // TODO confirmation
                 self.model.own_keys.generate();
                 self.model.status.set("New keypair generated");
             }
@@ -308,7 +326,9 @@ impl Sandbox for KeystrApp {
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
             Message::KeysSecretkeyImport => {
                 if !self.model.acknowledge_security_warning {
-                    self.model.status.set_error("Need to accept security warning!");
+                    self.model
+                        .status
+                        .set_error("Need to accept security warning!");
                 } else {
                     match self
                         .model
