@@ -4,6 +4,7 @@ mod keystore;
 mod keystr_model;
 //mod kind_filter;
 mod nostr_lib;
+mod security_settings;
 mod ui_iced;
 
 use crate::ui_iced::KeystrApp;

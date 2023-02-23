@@ -1,4 +1,5 @@
-use crate::keystr_model::{KeystrModel, SecurityLevel, SECURITY_LEVELS};
+use crate::keystr_model::KeystrModel;
+use crate::security_settings::{SecurityLevel, SECURITY_LEVELS};
 
 use iced::widget::{button, column, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
@@ -256,10 +257,10 @@ impl KeystrApp {
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
             text("Check the warnings and set your security level below:").size(20),
-            text(&self.model.get_security_warning_secret()).size(15),
+            text(&self.model.security_settings.get_security_warning_secret()).size(15),
             pick_list(
                 SECURITY_LEVELS,
-                Some(self.model.security_level),
+                Some(self.model.security_settings.security_level),
                 Message::SecurityLevelChange
             )
             .text_size(15),
@@ -372,7 +373,7 @@ impl Sandbox for KeystrApp {
                     },
                 };
             }
-            Message::SecurityLevelChange(l) => self.model.security_level = l,
+            Message::SecurityLevelChange(l) => self.model.security_settings.security_level = l,
             Message::ChangedReadonly(_s) => {}
         }
     }
