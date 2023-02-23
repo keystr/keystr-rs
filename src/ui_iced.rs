@@ -277,7 +277,8 @@ impl KeystrApp {
             iced::widget::rule::Rule::horizontal(5),
             self.tab_selector(),
             iced::widget::rule::Rule::horizontal(5),
-            text(&format!("| {}", &self.model.status.get_butlast())).size(15),
+            text(&format!("| {}", &self.model.status.get_last_n(3))).size(15),
+            text(&format!("| {}", &self.model.status.get_last_n(2))).size(15),
             text(&format!("| {}", &self.model.status.get_last())).size(15),
             iced::widget::rule::Rule::horizontal(5),
             match self.current_tab {
