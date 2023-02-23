@@ -255,7 +255,7 @@ impl KeystrApp {
         column![
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
-            text("Consider the warnings and set your suitable security level below:").size(15),
+            text("Check the warnings and set your security level below:").size(20),
             text(&self.model.get_security_warning_secret()).size(15),
             pick_list(
                 SECURITY_LEVELS,
