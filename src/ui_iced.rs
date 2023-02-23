@@ -15,6 +15,8 @@ pub enum Message {
     TabSelect(Tab),
     KeysClear,
     KeysGenerate,
+    KeysSave,
+    KeysLoad,
     KeysPubkeyInput(String),
     KeysPubkeyImport,
     KeysSecretkeyInput(String),
@@ -33,11 +35,17 @@ pub enum Message {
 
 pub(crate) struct KeystrApp {
     pub model: KeystrModel,
-
     current_tab: Tab,
 }
 
 impl KeystrApp {
+    pub fn new() -> Self {
+        Self {
+            model: KeystrModel::new(),
+            current_tab: Tab::Keys,
+        }
+    }
+
     fn tab_selector(&self) -> Element<Message> {
         row![
             button("Keys").on_press(Message::TabSelect(Tab::Keys)),
@@ -68,6 +76,8 @@ impl KeystrApp {
             .password()
             .size(15),
             row![
+                button("Save").on_press(Message::KeysSave),
+                button("Load").on_press(Message::KeysLoad),
                 button("Generate new keypair").on_press(Message::KeysGenerate),
                 button("Clear keys").on_press(Message::KeysClear),
             ]
@@ -286,12 +296,7 @@ impl Sandbox for KeystrApp {
     type Message = Message;
 
     fn new() -> Self {
-        let mut app = KeystrApp {
-            model: KeystrModel::new(),
-            current_tab: Tab::Keys,
-        };
-        app.model.status.set("Keystr started");
-        app
+        KeystrApp::new()
     }
 
     fn title(&self) -> String {
@@ -313,6 +318,14 @@ impl Sandbox for KeystrApp {
                 self.model.own_keys.generate();
                 self.model.status.set("New keypair generated");
             }
+            Message::KeysSave => self
+                .model
+                .own_keys
+                .save_action(&self.model.security_settings, &mut self.model.status),
+            Message::KeysLoad => self
+                .model
+                .own_keys
+                .load_action(&self.model.security_settings, &mut self.model.status),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
             Message::KeysPubkeyImport => {
                 match self

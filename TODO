@@ -1,6 +1,6 @@
-- Persist keys
 - Persist settings, security level
 - Store keys encrypted
+- Make sure secrets file has RO permissions
 - Show QR code for keys (pub)
 - Status: for error, show popup
 - Make Copy button work (copy to clipboard)

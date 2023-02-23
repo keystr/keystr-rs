@@ -1,6 +1,6 @@
 use std::fmt;
 
-pub(crate) struct SecuritySettings {
+pub struct SecuritySettings {
     pub security_level: SecurityLevel,
 }
 
@@ -10,7 +10,7 @@ pub enum SecurityLevel {
     /// Never persist secret key
     Never,
     /// Persist but only encrypted
-    PersistEncryptedOnly,
+    // PersistEncryptedOnly,
     /// Persist security key
     Persist,
 }
@@ -24,14 +24,14 @@ impl fmt::Display for SecurityLevel {
 
 pub(crate) static SECURITY_LEVELS: &[SecurityLevel] = &[
     SecurityLevel::Never,
-    SecurityLevel::PersistEncryptedOnly,
+    // SecurityLevel::PersistEncryptedOnly,
     SecurityLevel::Persist,
 ];
 
 impl SecuritySettings {
     pub fn new() -> Self {
         Self {
-            security_level: SecurityLevel::PersistEncryptedOnly,
+            security_level: SecurityLevel::Never, // TODO PersistEncryptedOnly,
         }
     }
 
@@ -43,8 +43,13 @@ impl SecuritySettings {
     pub fn get_security_level_desc(level: SecurityLevel) -> String {
         match level {
             SecurityLevel::Never => "! Never persist secret keys. If I decide to import a secret key, it should only live in the memory of the app in the current session.".to_string(),
-            SecurityLevel::PersistEncryptedOnly => "!! Secret key may be persisted, but only encrypted using a passphrase I provide.".to_string(),
+            // SecurityLevel::PersistEncryptedOnly => "!! Secret key may be persisted, but only encrypted using a passphrase I provide.".to_string(),
             SecurityLevel::Persist => "!!! Secret key may be persisted in local storage, for safekeeping and convenience (encrypted or not)".to_string(),
         }
+    }
+
+    pub fn allows_persist(&self) -> bool {
+        self.security_level == SecurityLevel::Persist
+        // TODO || self.security_level == SecurityLevel::PersistEncryptedOnly
     }
 }

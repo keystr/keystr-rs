@@ -1,5 +1,7 @@
-use crate::error::Error;
+use crate::{error::Error, keystr_model::StatusMessages, security_settings::SecuritySettings};
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
+
+use std::fs;
 
 #[derive(PartialEq)]
 pub enum KeysSetState {
@@ -9,8 +11,11 @@ pub enum KeysSetState {
 }
 
 // Model for KeyStore part
+#[readonly::make]
 pub struct Keystore {
     pub set_level: KeysSetState,
+    #[readonly]
+    has_unsaved_change: bool,
     keys: Keys,
     // Input for public key import
     pub public_key_input: String,
@@ -18,16 +23,20 @@ pub struct Keystore {
     pub secret_key_input: String,
 }
 
+const SECRET_FILENAME: &str = ".keystr_sec";
+
 impl Keystore {
     pub fn new() -> Self {
         Keystore {
             set_level: KeysSetState::NotSet,
+            has_unsaved_change: false,
             keys: Keys::generate(), // placeholder value initially
             public_key_input: String::new(),
             secret_key_input: String::new(),
         }
     }
 
+    /// Action to clear existing keys
     pub fn clear(&mut self) {
         self.keys = Keys::generate();
         self.set_level = KeysSetState::NotSet;
@@ -37,6 +46,7 @@ impl Keystore {
     pub fn generate(&mut self) {
         self.keys = Keys::generate();
         self.set_level = KeysSetState::SecretAndPublic;
+        self.has_unsaved_change = true;
     }
 
     /// Import public key only, in 'npub' bech32 or hex format. Signing will not be possible.
@@ -44,6 +54,7 @@ impl Keystore {
         self.clear();
         self.keys = Keys::from_pk_str(public_key_str)?;
         self.set_level = KeysSetState::PublicOnly;
+        self.has_unsaved_change = true;
         Ok(())
     }
 
@@ -53,7 +64,67 @@ impl Keystore {
         self.clear();
         self.keys = Keys::from_sk_str(secret_key_str)?;
         self.set_level = KeysSetState::SecretAndPublic;
+        self.has_unsaved_change = true;
         Ok(())
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Save secret key to file.
+    pub fn save(&mut self) -> Result<(), Error> {
+        if !self.is_secret_key_set() {
+            return Err(Error::KeyNotSet);
+        }
+        if !self.has_unsaved_change {
+            return Err(Error::KeyNoChangeToSave);
+        }
+        let hex_string = hex::encode(self.keys.secret_key()?.secret_bytes());
+        fs::write(SECRET_FILENAME, hex_string.to_string())?;
+        Ok(())
+    }
+
+    /// Load secret key from file
+    pub fn load(&mut self) -> Result<(), Error> {
+        let sk_hex = fs::read_to_string(SECRET_FILENAME)?;
+        self.import_secret_key(&sk_hex)?;
+        Ok(())
+    }
+
+    /// Warning: Security-sensitive method!
+    ///.Action to save secret key from file
+    pub fn save_action(
+        &mut self,
+        security_settings: &SecuritySettings,
+        status: &mut StatusMessages,
+    ) {
+        let res = if !security_settings.allows_persist() {
+            Err(Error::KeySaveNotAllowed)
+        } else {
+            self.save()
+        };
+        if let Err(e) = res {
+            status.set_error_err(&e);
+        } else {
+            status.set("Secret key persisted to storage");
+        }
+    }
+
+    ///.Action to load secret key from file
+    pub fn load_action(
+        &mut self,
+        security_settings: &SecuritySettings,
+        status: &mut StatusMessages,
+    ) {
+        // TODO confirmation
+        let res = if !security_settings.allows_persist() {
+            Err(Error::KeyLoadNotAllowed)
+        } else {
+            self.load()
+        };
+        if let Err(e) = res {
+            status.set_error_err(&e);
+        } else {
+            status.set("Keys loaded from storage");
+        }
     }
 
     pub fn is_public_key_set(&self) -> bool {

@@ -1,4 +1,6 @@
-use crate::{delegator::Delegator, keystore::Keystore, security_settings::SecuritySettings};
+use crate::{
+    delegator::Delegator, error::Error, keystore::Keystore, security_settings::SecuritySettings,
+};
 
 pub(crate) struct KeystrModel {
     pub own_keys: Keystore,
@@ -9,18 +11,26 @@ pub(crate) struct KeystrModel {
 
 impl KeystrModel {
     pub fn new() -> Self {
-        Self {
+        let mut model = Self {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
             status: StatusMessages::new(),
             security_settings: SecuritySettings::new(),
+        };
+        model.status.set("Keystr started");
+        //. Try load
+        if model.security_settings.allows_persist() {
+            let _res = model
+                .own_keys
+                .load_action(&model.security_settings, &mut model.status);
         }
+        model
     }
 }
 
 const STATUS_MAX_LINES: usize = 10;
 
-pub(crate) struct StatusMessages {
+pub struct StatusMessages {
     status_lines: Vec<String>,
 }
 
@@ -38,8 +48,12 @@ impl StatusMessages {
         self.status_lines.push(s.to_string());
     }
 
-    pub fn set_error(&mut self, s: &str) {
-        self.set(&format!("Error: {}!", s.to_string()));
+    pub fn set_error(&mut self, es: &str) {
+        self.set(&format!("Error: {}!", es.to_string()));
+    }
+
+    pub fn set_error_err(&mut self, e: &Error) {
+        self.set_error(&e.to_string());
     }
 
     pub fn get_last(&self) -> String {
