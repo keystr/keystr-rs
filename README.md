@@ -22,7 +22,7 @@ Written in Rust, with simple UI (Iced).
 
 ## Building and Running
 
-- Prerequisite: `rust`, >= 1.64
+- Prerequisite: `rust`, v >= 1.67
 
 - Simply run:  `cargo run`
 

@@ -22,7 +22,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml','**/Cargo.lock') }}
     - name: Set default toolchain
       run: |
-        rustup default 1.64.0
+        rustup default 1.67.0
         rustc --version
     - name: Build
       run: cargo build
