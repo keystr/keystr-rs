@@ -10,19 +10,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update && sudo apt-get install rustc --fix-missing
-        rustc --version
-    - name: Cache Rust
-      uses: Swatinem/rust-cache@v2
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Cache
+      uses: actions/cache@v3
       with:
-        workspaces: |
-          rust
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml','**/Cargo.lock') }}
+    - name: Set default toolchain
+      run: |
+        rustup default 1.67.0
+        rustc --version
     - name: Build
-      run: |
-        cargo build
+      run: cargo build
     - name: Running tests
-      run: |
-        cargo test
+      run: cargo test

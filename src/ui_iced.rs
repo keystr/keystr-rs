@@ -1,6 +1,7 @@
 use crate::keystr_model::KeystrModel;
+use crate::security_settings::{SecurityLevel, SECURITY_LEVELS};
 
-use iced::widget::{button, column, row, text, text_input};
+use iced::widget::{button, column, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,7 +13,10 @@ pub enum Tab {
 #[derive(Debug, Clone)]
 pub enum Message {
     TabSelect(Tab),
+    KeysClear,
     KeysGenerate,
+    KeysSave,
+    KeysLoad,
     KeysPubkeyInput(String),
     KeysPubkeyImport,
     KeysSecretkeyInput(String),
@@ -25,16 +29,23 @@ pub enum Message {
     DelegateTimeEndChanged(String),
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
+    SecurityLevelChange(SecurityLevel),
     ChangedReadonly(String),
 }
 
 pub(crate) struct KeystrApp {
     pub model: KeystrModel,
-
     current_tab: Tab,
 }
 
 impl KeystrApp {
+    pub fn new() -> Self {
+        Self {
+            model: KeystrModel::new(),
+            current_tab: Tab::Keys,
+        }
+    }
+
     fn tab_selector(&self) -> Element<Message> {
         row![
             button("Keys").on_press(Message::TabSelect(Tab::Keys)),
@@ -64,7 +75,15 @@ impl KeystrApp {
             )
             .password()
             .size(15),
-            button("Generate new keypair").on_press(Message::KeysGenerate),
+            row![
+                button("Save").on_press(Message::KeysSave),
+                button("Load").on_press(Message::KeysLoad),
+                button("Generate new keypair").on_press(Message::KeysGenerate),
+                button("Clear keys").on_press(Message::KeysClear),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
             row![
                 text_input(
                     "npub or hex for public key import",
@@ -83,6 +102,7 @@ impl KeystrApp {
                     &self.model.own_keys.secret_key_input,
                     Message::KeysSecretkeyInput,
                 )
+                .password()
                 .size(15),
                 button("Import Secret key").on_press(Message::KeysSecretkeyImport),
             ]
@@ -242,13 +262,24 @@ impl KeystrApp {
         .into()
     }
 
-    fn tabs(&self) -> Element<Message> {
+    fn view(&self) -> Element<Message> {
         column![
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
+            text("Check the warnings and set your security level below:").size(20),
+            text(&self.model.security_settings.get_security_warning_secret()).size(15),
+            pick_list(
+                SECURITY_LEVELS,
+                Some(self.model.security_settings.security_level),
+                Message::SecurityLevelChange
+            )
+            .text_size(15),
+            iced::widget::rule::Rule::horizontal(5),
             self.tab_selector(),
             iced::widget::rule::Rule::horizontal(5),
-            text_input("status", &self.model.status_line, Message::ChangedReadonly,).size(15),
+            text(&format!("| {}", &self.model.status.get_last_n(3))).size(15),
+            text(&format!("| {}", &self.model.status.get_last_n(2))).size(15),
+            text(&format!("| {}", &self.model.status.get_last())).size(15),
             iced::widget::rule::Rule::horizontal(5),
             match self.current_tab {
                 Tab::Keys => self.tab_keys(),
@@ -266,12 +297,7 @@ impl Sandbox for KeystrApp {
     type Message = Message;
 
     fn new() -> Self {
-        let mut app = KeystrApp {
-            model: KeystrModel::new(),
-            current_tab: Tab::Keys,
-        };
-        app.model.set_status("Keystr started");
-        app
+        KeystrApp::new()
     }
 
     fn title(&self) -> String {
@@ -283,7 +309,24 @@ impl Sandbox for KeystrApp {
             Message::TabSelect(t) => {
                 self.current_tab = t;
             }
-            Message::KeysGenerate => self.model.own_keys.generate(),
+            Message::KeysClear => {
+                // TODO confirmation
+                self.model.own_keys.clear();
+                self.model.status.set("Keys cleared");
+            }
+            Message::KeysGenerate => {
+                // TODO confirmation
+                self.model.own_keys.generate();
+                self.model.status.set("New keypair generated");
+            }
+            Message::KeysSave => self
+                .model
+                .own_keys
+                .save_action(&self.model.security_settings, &mut self.model.status),
+            Message::KeysLoad => self
+                .model
+                .own_keys
+                .load_action(&self.model.security_settings, &mut self.model.status),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
             Message::KeysPubkeyImport => {
                 match self
@@ -291,8 +334,8 @@ impl Sandbox for KeystrApp {
                     .own_keys
                     .import_public_key(&self.model.own_keys.public_key_input.clone())
                 {
-                    Err(e) => self.model.set_error_status(&e.to_string()),
-                    Ok(_) => self.model.set_status("Public key imported"),
+                    Err(e) => self.model.status.set_error(&e.to_string()),
+                    Ok(_) => self.model.status.set("Public key imported"),
                 };
                 // cleanup
                 self.model.own_keys.public_key_input = String::new();
@@ -304,8 +347,8 @@ impl Sandbox for KeystrApp {
                     .own_keys
                     .import_secret_key(&self.model.own_keys.secret_key_input.clone())
                 {
-                    Err(e) => self.model.set_error_status(&e.to_string()),
-                    Ok(_) => self.model.set_status("Secret key imported"),
+                    Err(e) => self.model.status.set_error(&e.to_string()),
+                    Ok(_) => self.model.status.set("Secret key imported"),
                 };
                 // cleanup
                 self.model.own_keys.secret_key_input = String::new();
@@ -313,14 +356,14 @@ impl Sandbox for KeystrApp {
             Message::DelegateDeeChanged(s) => {
                 self.model.delegator.delegatee_npub_input = s;
                 if let Err(e) = self.model.delegator.validate_and_update() {
-                    self.model.set_error_status(&e.to_string());
+                    self.model.status.set_error(&e.to_string());
                 }
             }
             Message::DelegateDeeGenerate => self.model.delegator.generate_random_delegatee(),
             Message::DelegateKindChanged(s) => {
                 self.model.delegator.kind_condition_input = s;
                 if let Err(e) = self.model.delegator.validate_and_update() {
-                    self.model.set_error_status(&e.to_string());
+                    self.model.status.set_error(&e.to_string());
                 }
             }
             Message::DelegateTimeStartChanged(s) => {
@@ -337,18 +380,19 @@ impl Sandbox for KeystrApp {
             }
             Message::DelegateSign => {
                 match self.model.own_keys.get_keys() {
-                    Err(e) => self.model.set_error_status(&e.to_string()),
+                    Err(e) => self.model.status.set_error(&e.to_string()),
                     Ok(keys) => match self.model.delegator.create_delegation(&keys) {
-                        Err(e) => self.model.set_error_status(&e.to_string()),
-                        Ok(_) => self.model.set_status("Delegation created"),
+                        Err(e) => self.model.status.set_error(&e.to_string()),
+                        Ok(_) => self.model.status.set("Delegation created"),
                     },
                 };
             }
+            Message::SecurityLevelChange(l) => self.model.security_settings.security_level = l,
             Message::ChangedReadonly(_s) => {}
         }
     }
 
     fn view(&self) -> Element<Message> {
-        self.tabs()
+        self.view()
     }
 }

@@ -1,8 +1,11 @@
-- Setting for security level (OK save, OK ask, never)
+- Persist settings, security level
+- Store keys encrypted
+- Make sure secrets file has RO permissions
+- Show QR code for keys (pub)
+- Status: for error, show popup
 - Make Copy button work (copy to clipboard)
 - Import mnemonic
-- Code org: move module part to separate module (later separate crate)
+- [UI] Action to show more logs
+- [Code org] move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
-- Store keys
-- Store keys encrypted
 - Multiple identities (main, etc.)
