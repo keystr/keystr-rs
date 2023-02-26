@@ -26,8 +26,10 @@ pub struct Keystore {
 
 /// Folder used to store data, relative to user home dir
 const LOCAL_STORAGE_FOLDER: &str = ".keystr";
-/// Secret storage file name, relative to folder.
-const SECRET_FILENAME: &str = ".nsec";
+/// Public key storage file name, relative to folder.
+const PUBLIC_KEY_FILENAME: &str = "npub";
+/// Secret key storage file name, relative to folder.
+const SECRET_KEY_FILENAME: &str = ".nsec";
 
 impl Keystore {
     pub fn new() -> Self {
@@ -74,16 +76,13 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     /// Save secret key to file.
-    pub fn save(&self) -> Result<(), Error> {
+    pub fn save_secret_key(&self) -> Result<(), Error> {
         if !self.is_secret_key_set() {
             return Err(Error::KeyNotSet);
         }
-        if !self.has_unsaved_change {
-            return Err(Error::KeyNoChangeToSave);
-        }
         Self::check_create_folder()?;
         let hex_string = hex::encode(self.keys.secret_key()?.secret_bytes());
-        let path = Self::full_file_path(SECRET_FILENAME);
+        let path = Self::full_file_path(SECRET_KEY_FILENAME);
         // create empty file
         fs::write(path.as_path(), "")?;
         // set permissions, TODO make it on non-unix as well
@@ -97,12 +96,60 @@ impl Keystore {
         Ok(())
     }
 
+    /// Save publick key to file.
+    pub fn save_public_key(&self) -> Result<(), Error> {
+        if !self.is_public_key_set() {
+            return Err(Error::KeyNotSet);
+        }
+        Self::check_create_folder()?;
+        let npub_string = self.keys.public_key().to_bech32()?;
+        fs::write(Self::full_file_path(PUBLIC_KEY_FILENAME), npub_string)?;
+        Ok(())
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Save public/secret key to file(s).
+    /// Returns if secret key has been saved
+    pub fn save_keys(&self) -> Result<bool, Error> {
+        if !self.has_unsaved_change {
+            return Err(Error::KeyNoChangeToSave);
+        }
+        // save public key
+        self.save_public_key()?;
+        // save secret key if set
+        if self.is_secret_key_set() {
+            self.save_secret_key()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Warning: Security-sensitive method!
     /// Load secret key from file
-    pub fn load(&mut self) -> Result<(), Error> {
-        let sk_hex = fs::read_to_string(Self::full_file_path(SECRET_FILENAME))?;
+    pub fn load_secret_key(&mut self) -> Result<(), Error> {
+        let sk_hex = fs::read_to_string(Self::full_file_path(SECRET_KEY_FILENAME))?;
         self.import_secret_key(&sk_hex)?;
         Ok(())
+    }
+
+    /// Load public key from file
+    pub fn load_public_key(&mut self) -> Result<(), Error> {
+        let pk_string = fs::read_to_string(Self::full_file_path(PUBLIC_KEY_FILENAME))?;
+        self.import_public_key(&pk_string)?;
+        Ok(())
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Load public/secret key from file
+    pub fn load_keys(&mut self) -> Result<(), Error> {
+        let secret_path  = Self::full_file_path(SECRET_KEY_FILENAME);
+        if secret_path.as_path().is_file() {
+            // secret key file exists, load secret key
+            return self.load_secret_key();
+        }
+        // load public key
+        self.load_public_key()
     }
 
     fn full_folder_path() -> PathBuf {
@@ -136,12 +183,15 @@ impl Keystore {
         let res = if !security_settings.allows_persist() {
             Err(Error::KeySaveNotAllowed)
         } else {
-            self.save()
+            self.save_keys()
         };
-        if let Err(e) = res {
-            status.set_error_err(&e);
-        } else {
-            status.set("Secret key persisted to storage");
+        match res {
+            Err(e) => status.set_error_err(&e),
+            Ok(ss) => if ss {
+                status.set("Secret key persisted to storage");
+            } else {
+                status.set("Public key persisted to storage");
+            },
         }
     }
 
@@ -155,7 +205,7 @@ impl Keystore {
         let res = if !security_settings.allows_persist() {
             Err(Error::KeyLoadNotAllowed)
         } else {
-            self.load()
+            self.load_keys()
         };
         if let Err(e) = res {
             status.set_error_err(&e);
@@ -193,7 +243,7 @@ impl Keystore {
     /// Warning: Security-sensitive method!
     pub fn get_nsec(&self) -> String {
         if !self.is_secret_key_set() {
-            "(not set)".to_string()
+            "".to_string()
         } else {
             match self.keys.secret_key() {
                 Err(_) => "(no secret key)".to_string(),

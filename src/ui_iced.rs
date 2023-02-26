@@ -69,7 +69,7 @@ impl KeystrApp {
             .size(15),
             text("Secret key (nsec):").size(15),
             text_input(
-                "nsec secret key",
+                "", // empty, placeholder also shows up asterisked
                 &self.model.own_keys.get_nsec(),
                 Message::ChangedReadonly,
             )

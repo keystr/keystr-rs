@@ -7,6 +7,7 @@ Written in Rust, with simple UI (Iced).
 
 - Key management:
   - Import of keys
+  - Save/Load keys
 - Delegations: Create delegation
 
 ## Screenshot
