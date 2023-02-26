@@ -266,7 +266,7 @@ mod test {
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
         assert_eq!(k.get_npub(), "(not set)");
-        assert_eq!(k.get_nsec(), "(not set)");
+        assert_eq!(k.get_nsec(), "");
         assert!(k.get_keys().is_err());
     }
 
