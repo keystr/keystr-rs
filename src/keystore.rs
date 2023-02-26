@@ -2,6 +2,7 @@ use crate::{error::Error, keystr_model::StatusMessages, security_settings::Secur
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
 
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(PartialEq)]
 pub enum KeysSetState {
@@ -23,7 +24,10 @@ pub struct Keystore {
     pub secret_key_input: String,
 }
 
-const SECRET_FILENAME: &str = ".keystr_sec";
+/// Folder used to store data, relative to user home dir
+const LOCAL_STORAGE_FOLDER: &str = ".keystr";
+/// Secret storage file name, relative to folder.
+const SECRET_FILENAME: &str = ".nsec";
 
 impl Keystore {
     pub fn new() -> Self {
@@ -70,29 +74,62 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     /// Save secret key to file.
-    pub fn save(&mut self) -> Result<(), Error> {
+    pub fn save(&self) -> Result<(), Error> {
         if !self.is_secret_key_set() {
             return Err(Error::KeyNotSet);
         }
         if !self.has_unsaved_change {
             return Err(Error::KeyNoChangeToSave);
         }
+        Self::check_create_folder()?;
         let hex_string = hex::encode(self.keys.secret_key()?.secret_bytes());
-        fs::write(SECRET_FILENAME, hex_string.to_string())?;
+        let path = Self::full_file_path(SECRET_FILENAME);
+        // create empty file
+        fs::write(path.as_path(), "")?;
+        // set permissions, TODO make it on non-unix as well
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path.as_path(), fs::Permissions::from_mode(0o600))?;
+        }
+        // write contents
+        fs::write(path.as_path(), hex_string.to_string())?;
         Ok(())
     }
 
+    /// Warning: Security-sensitive method!
     /// Load secret key from file
     pub fn load(&mut self) -> Result<(), Error> {
-        let sk_hex = fs::read_to_string(SECRET_FILENAME)?;
+        let sk_hex = fs::read_to_string(Self::full_file_path(SECRET_FILENAME))?;
         self.import_secret_key(&sk_hex)?;
+        Ok(())
+    }
+
+    fn full_folder_path() -> PathBuf {
+        let mut p = dirs::home_dir().unwrap_or(PathBuf::from("."));
+        p.push(LOCAL_STORAGE_FOLDER);
+        p
+    }
+
+    fn full_file_path(file_name: &str) -> PathBuf {
+        let mut p = Self::full_folder_path();
+        p.push(file_name);
+        p
+    }
+
+    fn check_create_folder() -> Result<(), Error> {
+        let p = Self::full_folder_path();
+        if p.is_dir() {
+            return Ok(())
+        }
+        fs::create_dir(p)?;
         Ok(())
     }
 
     /// Warning: Security-sensitive method!
     ///.Action to save secret key from file
     pub fn save_action(
-        &mut self,
+        &self,
         security_settings: &SecuritySettings,
         status: &mut StatusMessages,
     ) {

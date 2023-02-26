@@ -44,7 +44,7 @@ impl SecuritySettings {
         match level {
             SecurityLevel::Never => "! Never persist secret keys. If I decide to import a secret key, it should only live in the memory of the app in the current session.".to_string(),
             // SecurityLevel::PersistEncryptedOnly => "!! Secret key may be persisted, but only encrypted using a passphrase I provide.".to_string(),
-            SecurityLevel::Persist => "!!! Secret key may be persisted in local storage, for safekeeping and convenience (encrypted or not)".to_string(),
+            SecurityLevel::Persist => "!! Secret key may be persisted in local storage, for safekeeping and convenience (encrypted or not)".to_string(),
         }
     }
 
