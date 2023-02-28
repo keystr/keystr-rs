@@ -8,7 +8,7 @@ Written in Rust, with simple UI (Iced).
 - Key management:
   - Import of keys
   - Save/Load keys
-- Delegations: Create delegation
+- Delegations: Create NIP-26 delegation
 
 ## Screenshot
 
@@ -17,9 +17,9 @@ Written in Rust, with simple UI (Iced).
 ## Roadmap
 
 - Safekeeping of keys
-- Delegation
+- Delegation (NIP-26)
 - Profile
-- Signer
+- Remote Signer (NIP-46)
 
 ## Building and Running
 

@@ -2,7 +2,9 @@
 - Confirmations on UI
 - Store keys encrypted
 - Show QR code for keys (pub)
+- Relay support -- list, connect, query, send, etc.
 - Status: for error, show popup
+- Nostr Connect support
 - Make Copy button work (copy to clipboard)
 - Import mnemonic
 - [UI] Action to show more logs
