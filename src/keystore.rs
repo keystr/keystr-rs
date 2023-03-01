@@ -27,8 +27,8 @@ pub struct Keystore {
     pub save_repeat_password_input: String,
 }
 
-/// Folder used to store data, relative to user home dir
-const LOCAL_STORAGE_FOLDER: &str = ".keystr";
+/// Folder used to store data, relative to user data dir (~/.local/share)
+const LOCAL_STORAGE_FOLDER: &str = "keystr";
 /// Public key storage file name, relative to folder.
 const PUBLIC_KEY_FILENAME: &str = "npub";
 /// Encrypted secret key storage file name, relative to folder.
@@ -186,7 +186,7 @@ impl Keystore {
     }
 
     fn full_folder_path() -> PathBuf {
-        let mut p = dirs::home_dir().unwrap_or(PathBuf::from("."));
+        let mut p = dirs::data_local_dir().unwrap_or(PathBuf::from("."));
         p.push(LOCAL_STORAGE_FOLDER);
         p
     }
