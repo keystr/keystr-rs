@@ -133,6 +133,12 @@ impl KeystrApp {
             .align_items(Alignment::Fill)
             .spacing(5)
             .padding(0),
+            text(if self.model.own_keys.has_unsaved_change {
+                "There are Unsaved changes!"
+            } else {
+                "(no changes)"
+            })
+            .size(15),
             iced::widget::rule::Rule::horizontal(5),
             row![
                 button("Load").on_press(Message::KeysLoad),
@@ -448,18 +454,11 @@ impl Sandbox for KeystrApp {
             Message::KeysSaveRepeatPasswordInput(s) => {
                 self.model.own_keys.save_repeat_password_input = s
             }
-            Message::KeysSecretkeyImport => {
-                match self
-                    .model
-                    .own_keys
-                    .import_secret_key(&self.model.own_keys.secret_key_input.clone())
-                {
-                    Err(e) => self.model.status.set_error(&e.to_string()),
-                    Ok(_) => self.model.status.set("Secret key imported"),
-                };
-                // cleanup
-                self.model.own_keys.secret_key_input = String::new();
-            }
+            Message::KeysSecretkeyImport => self
+                .model
+                .own_keys
+                .import_secret_key_action(&mut self.model.status),
+
             Message::DelegateDeeChanged(s) => {
                 self.model.delegator.delegatee_npub_input = s;
                 if let Err(e) = self.model.delegator.validate_and_update() {

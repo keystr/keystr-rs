@@ -53,6 +53,7 @@ impl Keystore {
     pub fn clear(&mut self) {
         self.keys = None;
         self.encrypted_secret_key = None;
+        self.has_unsaved_change = false;
     }
 
     /// Generate new random keys
@@ -72,19 +73,27 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     /// Import secret key, in 'nsec' bech32 or hex format (pubkey is derived from it)
-    pub fn import_secret_key(&mut self, secret_key_str: &str) -> Result<(), Error> {
+    pub fn import_secret_key(
+        &mut self,
+        secret_key_str: &str,
+        is_changed: bool,
+    ) -> Result<(), Error> {
         self.clear();
         self.keys = Some(Keys::from_sk_str(secret_key_str)?);
-        self.has_unsaved_change = true;
+        self.has_unsaved_change = is_changed;
         Ok(())
     }
 
     /// Warning: Security-sensitive method!
-    pub fn import_encrypted_secret_key(&mut self, encrypted_key_str: &str) -> Result<(), Error> {
+    pub fn import_encrypted_secret_key(
+        &mut self,
+        encrypted_key_str: &str,
+        is_changed: bool,
+    ) -> Result<(), Error> {
         self.clear();
         self.encrypted_secret_key =
             Some(hex::decode(encrypted_key_str).map_err(|_e| Error::KeyInvalidEncrypted)?);
-        self.has_unsaved_change = true;
+        self.has_unsaved_change = is_changed;
         Ok(())
     }
 
@@ -96,7 +105,7 @@ impl Keystore {
             Some(d) => d,
         };
         let sk = Encrypt::decrypt_key(&sk_bytes, &password)?;
-        self.import_secret_key(&sk.to_bech32()?)
+        self.import_secret_key(&sk.to_bech32()?, false)
     }
 
     /// Warning: Security-sensitive method!
@@ -159,7 +168,7 @@ impl Keystore {
     /// Load secret key from file
     pub fn load_secret_key(&mut self) -> Result<(), Error> {
         let sk_hex = fs::read_to_string(Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME))?;
-        self.import_encrypted_secret_key(&sk_hex)?;
+        self.import_encrypted_secret_key(&sk_hex, false)?;
         // Also try to decrypt with empty password, set it if successful, ignore if not
         let _ret = self.decrypt_secret_key("");
         Ok(())
@@ -271,6 +280,17 @@ impl Keystore {
         }
     }
 
+    /// Warning: Security-sensitive method!
+    /// Import secret key, in 'nsec' bech32 or hex format (pubkey is derived from it)
+    pub fn import_secret_key_action(&mut self, status: &mut StatusMessages) {
+        match self.import_secret_key(&self.secret_key_input.clone(), true) {
+            Err(e) => status.set_error(&format!("Error importing, {}", e.to_string())),
+            Ok(_) => status.set("Secret key imported"),
+        };
+        // cleanup
+        self.secret_key_input = String::new();
+    }
+
     #[cfg(test)]
     pub fn is_public_key_set(&self) -> bool {
         self.get_public_key().is_ok()
@@ -377,7 +397,10 @@ mod test {
     fn test_import_secret_key() {
         let mut k = Keystore::new();
         let _res = k
-            .import_secret_key("nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae")
+            .import_secret_key(
+                "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae",
+                true,
+            )
             .unwrap();
         assert!(k.is_public_key_set());
         assert!(k.is_secret_key_set());
@@ -396,7 +419,10 @@ mod test {
     fn test_import_secret_key_hex() {
         let mut k = Keystore::new();
         let _res = k
-            .import_secret_key("b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17")
+            .import_secret_key(
+                "b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17",
+                true,
+            )
             .unwrap();
         k.hide_secret_key = false;
         assert_eq!(
@@ -408,7 +434,7 @@ mod test {
     #[test]
     fn test_import_secret_key_hex_invalid() {
         let mut k = Keystore::new();
-        let res = k.import_secret_key("__NOT_A_VALID_KEY__");
+        let res = k.import_secret_key("__NOT_A_VALID_KEY__", true);
         assert!(res.is_err());
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
