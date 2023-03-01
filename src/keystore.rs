@@ -1,7 +1,7 @@
 use crate::encrypt::Encrypt;
 use crate::error::Error;
 use crate::keystr_model::StatusMessages;
-use crate::security_settings::SecuritySettings;
+use crate::security_settings::{SecurityLevel, SecuritySettings};
 use crate::storage::Storage;
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
 
@@ -107,10 +107,9 @@ impl Keystore {
         let sk = self.get_secret_key()?;
 
         if self.save_password_input != self.save_repeat_password_input {
-            return Err(Error::KeyEncryptionPassword);
+            return Err(Error::KeyEncryptionPasswordMismatch);
         }
         let password = &self.save_password_input;
-        // TODO check if password is OK, not missing, length, etc.
 
         Storage::check_create_folder()?;
         let data = Encrypt::encrypt_key(&sk, &password, Encrypt::default_log2_rounds())?;
@@ -197,7 +196,13 @@ impl Keystore {
         let res = if !security_settings.allows_persist() {
             Err(Error::KeySaveNotAllowed)
         } else {
-            self.save_keys()
+            if security_settings.security_level == SecurityLevel::PersistMandatoryPassword
+                && self.save_password_input.is_empty()
+            {
+                Err(Error::KeyEncryptionPasswordMissing)
+            } else {
+                self.save_keys()
+            }
         };
         match res {
             Err(e) => status.set_error_err(&e),
@@ -235,11 +240,18 @@ impl Keystore {
 
     pub fn unlock_secret_key_action(
         &mut self,
-        _security_settings: &SecuritySettings,
+        security_settings: &SecuritySettings,
         status: &mut StatusMessages,
     ) {
         // check if password is set if needed
-        match self.decrypt_secret_key(&self.decrypt_password_input.clone()) {
+        let res = if security_settings.security_level == SecurityLevel::PersistMandatoryPassword
+            && self.decrypt_password_input.is_empty()
+        {
+            Err(Error::KeyEncryptionPasswordMissing)
+        } else {
+            self.decrypt_secret_key(&self.decrypt_password_input.clone())
+        };
+        match res {
             Err(e) => status.set(&format!(
                 "Could not decrypt secret key, check password! ({})",
                 e

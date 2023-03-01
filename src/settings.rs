@@ -22,7 +22,7 @@ impl Settings {
         let str = serde_json::to_string(&self)?;
         Storage::check_create_folder()?;
         fs::write(Storage::settings_file(), str)?;
-        Ok(()) // TODO
+        Ok(())
     }
 
     pub fn load() -> Result<Self, Error> {

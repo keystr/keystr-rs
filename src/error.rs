@@ -27,9 +27,12 @@ pub enum Error {
     /// Invalid encryption version
     #[error("Invalid encryption version")]
     KeyInvalidEncryptionVersion,
-    /// Encryption passowrds don't match
-    #[error("Encryption passowrds don't match")]
-    KeyEncryptionPassword,
+    /// Mandatory encryption password missing
+    #[error("Mandatory encryption password missing. Check password and security settings")]
+    KeyEncryptionPasswordMissing,
+    /// Encryption passwords don't match
+    #[error("Encryption passwords don't match")]
+    KeyEncryptionPasswordMismatch,
     /// NostrLib error
     #[error(transparent)]
     NostrLibError(#[from] crate::nostr_lib::Error),
