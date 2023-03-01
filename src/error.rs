@@ -42,4 +42,7 @@ pub enum Error {
     /// IO error, e.g. file/folder error
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    /// JSON serialization error
+    #[error(transparent)]
+    JsonError(#[from] serde_json::Error),
 }

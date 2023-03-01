@@ -2,10 +2,10 @@ use crate::encrypt::Encrypt;
 use crate::error::Error;
 use crate::keystr_model::StatusMessages;
 use crate::security_settings::SecuritySettings;
+use crate::storage::Storage;
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
 
 use std::fs;
-use std::path::PathBuf;
 
 // Model for KeyStore part
 #[readonly::make]
@@ -26,13 +26,6 @@ pub struct Keystore {
     // Input for repeat encryption password, for save
     pub save_repeat_password_input: String,
 }
-
-/// Folder used to store data, relative to user data dir (~/.local/share)
-const LOCAL_STORAGE_FOLDER: &str = "keystr";
-/// Public key storage file name, relative to folder.
-const PUBLIC_KEY_FILENAME: &str = "npub";
-/// Encrypted secret key storage file name, relative to folder.
-const ENCRYPTED_SECRET_KEY_FILENAME: &str = ".ncrypt";
 
 impl Keystore {
     pub fn new() -> Self {
@@ -119,10 +112,10 @@ impl Keystore {
         let password = &self.save_password_input;
         // TODO check if password is OK, not missing, length, etc.
 
-        Self::check_create_folder()?;
+        Storage::check_create_folder()?;
         let data = Encrypt::encrypt_key(&sk, &password, Encrypt::default_log2_rounds())?;
         let hex_string = hex::encode(data);
-        let path = Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME);
+        let path = Storage::encrypted_secret_key_file();
         // create empty file
         fs::write(path.as_path(), "")?;
         // set permissions, TODO make it on non-unix as well
@@ -137,12 +130,12 @@ impl Keystore {
         Ok(())
     }
 
-    /// Save publick key to file.
+    /// Save public key to file.
     pub fn save_public_key(&self) -> Result<(), Error> {
         let pubkey = self.get_public_key()?;
-        Self::check_create_folder()?;
+        Storage::check_create_folder()?;
         let npub_string = pubkey.to_bech32()?;
-        fs::write(Self::full_file_path(PUBLIC_KEY_FILENAME), npub_string)?;
+        fs::write(Storage::public_key_file(), npub_string)?;
         Ok(())
     }
 
@@ -167,7 +160,7 @@ impl Keystore {
     /// Warning: Security-sensitive method!
     /// Load secret key from file
     pub fn load_secret_key(&mut self) -> Result<(), Error> {
-        let sk_hex = fs::read_to_string(Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME))?;
+        let sk_hex = fs::read_to_string(Storage::encrypted_secret_key_file())?;
         self.import_encrypted_secret_key(&sk_hex, false)?;
         // Also try to decrypt with empty password, set it if successful, ignore if not
         let _ret = self.decrypt_secret_key("");
@@ -176,7 +169,7 @@ impl Keystore {
 
     /// Load public key from file
     pub fn load_public_key(&mut self) -> Result<(), Error> {
-        let pk_string = fs::read_to_string(Self::full_file_path(PUBLIC_KEY_FILENAME))?;
+        let pk_string = fs::read_to_string(Storage::public_key_file())?;
         self.import_public_key(&pk_string)?;
         Ok(())
     }
@@ -184,7 +177,7 @@ impl Keystore {
     /// Warning: Security-sensitive method!
     /// Load public/secret key from file
     pub fn load_keys(&mut self) -> Result<(), Error> {
-        let secret_path = Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME);
+        let secret_path = Storage::encrypted_secret_key_file();
         if secret_path.as_path().is_file() {
             // secret key file exists, load secret key
             self.load_secret_key()
@@ -192,27 +185,6 @@ impl Keystore {
             // load public key
             self.load_public_key()
         }
-    }
-
-    fn full_folder_path() -> PathBuf {
-        let mut p = dirs::data_local_dir().unwrap_or(PathBuf::from("."));
-        p.push(LOCAL_STORAGE_FOLDER);
-        p
-    }
-
-    fn full_file_path(file_name: &str) -> PathBuf {
-        let mut p = Self::full_folder_path();
-        p.push(file_name);
-        p
-    }
-
-    fn check_create_folder() -> Result<(), Error> {
-        let p = Self::full_folder_path();
-        if p.is_dir() {
-            return Ok(());
-        }
-        fs::create_dir(p)?;
-        Ok(())
     }
 
     /// Warning: Security-sensitive method!

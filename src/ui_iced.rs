@@ -368,10 +368,10 @@ impl KeystrApp {
             text("Nostr Keystore").size(25),
             iced::widget::rule::Rule::horizontal(5),
             text("Check the warnings and set your security level below:").size(20),
-            text(&self.model.security_settings.get_security_warning_secret()).size(15),
+            text(&self.model.settings.security.get_security_warning_secret()).size(15),
             pick_list(
                 SECURITY_LEVELS,
-                Some(self.model.security_settings.security_level),
+                Some(self.model.settings.security.security_level),
                 Message::SecurityLevelChange
             )
             .text_size(15),
@@ -423,11 +423,11 @@ impl Sandbox for KeystrApp {
             Message::KeysSave => self
                 .model
                 .own_keys
-                .save_action(&self.model.security_settings, &mut self.model.status),
+                .save_action(&self.model.settings.security, &mut self.model.status),
             Message::KeysLoad => self
                 .model
                 .own_keys
-                .load_action(&self.model.security_settings, &mut self.model.status),
+                .load_action(&self.model.settings.security, &mut self.model.status),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
             Message::KeysToggleHideSecretKey => {
                 self.model.own_keys.hide_secret_key = !self.model.own_keys.hide_secret_key
@@ -448,7 +448,7 @@ impl Sandbox for KeystrApp {
             Message::KeysUnlock => self
                 .model
                 .own_keys
-                .unlock_secret_key_action(&self.model.security_settings, &mut self.model.status),
+                .unlock_secret_key_action(&self.model.settings.security, &mut self.model.status),
             Message::KeysDecryptPasswordInput(s) => self.model.own_keys.decrypt_password_input = s,
             Message::KeysSavePasswordInput(s) => self.model.own_keys.save_password_input = s,
             Message::KeysSaveRepeatPasswordInput(s) => {
@@ -493,7 +493,7 @@ impl Sandbox for KeystrApp {
                     },
                 };
             }
-            Message::SecurityLevelChange(l) => self.model.security_settings.security_level = l,
+            Message::SecurityLevelChange(l) => self.model.settings.set_security_level(l),
             Message::ChangedReadonly(_s) => {}
             Message::NoOp => {}
         }

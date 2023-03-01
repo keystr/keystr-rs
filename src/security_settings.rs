@@ -1,18 +1,23 @@
+use serde::{Deserialize, Serialize};
+
 use std::fmt;
 
+/// Security-related settings
+#[derive(Default, Serialize, Deserialize)]
 pub struct SecuritySettings {
     pub security_level: SecurityLevel,
 }
 
 /// Security level regarding secret key handling/persistence; chosen by the user
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SecurityLevel {
     /// Never persist secret key
     Never,
-    /// Persist but only encrypted
-    // PersistEncryptedOnly,
-    /// Persist security key
+    /// Persist security key, encrypted, with optional password
+    #[default] // TODO PersistEncryptedOnly
     Persist,
+    // Persist but only encrypted
+    // PersistEncryptedOnly,
 }
 
 impl fmt::Display for SecurityLevel {
@@ -29,12 +34,6 @@ pub(crate) static SECURITY_LEVELS: &[SecurityLevel] = &[
 ];
 
 impl SecuritySettings {
-    pub fn new() -> Self {
-        Self {
-            security_level: SecurityLevel::Never, // TODO PersistEncryptedOnly,
-        }
-    }
-
     pub fn get_security_warning_secret(&self) -> String {
         "I understand that if the secret key leaks to the wrong hands, the entire identity is COMPROMISED irreversibly.\n\
         I must make backups of security keys, because if they are lost, the identity is LOST forever.".to_string()

@@ -1,12 +1,10 @@
-use crate::{
-    delegator::Delegator, error::Error, keystore::Keystore, security_settings::SecuritySettings,
-};
+use crate::{delegator::Delegator, error::Error, keystore::Keystore, settings::Settings};
 
 pub(crate) struct KeystrModel {
     pub own_keys: Keystore,
     pub delegator: Delegator,
     pub status: StatusMessages,
-    pub security_settings: SecuritySettings,
+    pub settings: Settings,
 }
 
 impl KeystrModel {
@@ -15,14 +13,18 @@ impl KeystrModel {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
             status: StatusMessages::new(),
-            security_settings: SecuritySettings::new(),
+            settings: Settings::default(),
         };
         model.status.set("Keystr started");
-        //. Try load
-        if model.security_settings.allows_persist() {
+        //. Try load settings
+        if let Ok(sett) = Settings::load() {
+            model.settings = sett;
+        }
+        //. Try load keys
+        if model.settings.security.allows_persist() {
             let _res = model
                 .own_keys
-                .load_action(&model.security_settings, &mut model.status);
+                .load_action(&model.settings.security, &mut model.status);
         }
         model
     }
