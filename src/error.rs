@@ -15,6 +15,18 @@ pub enum Error {
     /// Key error
     #[error(transparent)]
     KeyError(#[from] nostr::key::Error),
+    /// Secp256k1 key error
+    #[error(transparent)]
+    KeyErrorSecp256k1(#[from] nostr::secp256k1::Error),
+    /// Invalid encrypted key
+    #[error("Invalid encrypted key")]
+    KeyInvalidEncrypted,
+    /// Encryption error
+    #[error("Encryption error")]
+    KeyEncryption,
+    /// Invalid encryption version
+    #[error("Invalid encryption version")]
+    KeyInvalidEncryptionVersion,
     /// NostrLib error
     #[error(transparent)]
     NostrLibError(#[from] crate::nostr_lib::Error),

@@ -84,6 +84,7 @@ impl KeystrApp {
             .align_items(Alignment::Fill)
             .spacing(5)
             .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
             row![
                 text_input(
                     "npub or hex for public key import",
@@ -96,6 +97,7 @@ impl KeystrApp {
             .align_items(Alignment::Fill)
             .spacing(5)
             .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
             row![
                 text_input(
                     "npub or hex for secret key import",
@@ -109,6 +111,7 @@ impl KeystrApp {
             .align_items(Alignment::Fill)
             .spacing(5)
             .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
         ]
         .align_items(Alignment::Fill)
         .spacing(5)

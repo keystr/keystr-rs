@@ -6,8 +6,11 @@ use std::path::PathBuf;
 
 #[derive(PartialEq)]
 pub enum KeysSetState {
+    /// No keys set
     NotSet,
+    /// Only public key is set, cannot sign
     PublicOnly,
+    /// Secret key is set, therefore public key as well; can also sign
     SecretAndPublic,
 }
 

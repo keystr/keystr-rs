@@ -5,6 +5,7 @@ edition = "2021"
 description = "An application for managing Nostr keys. Written in Rust, with simple UI (Iced)."
 homepage = "https://github.com/keystr/keystr-rs"
 repository = "https://github.com/keystr/keystr-rs.git"
+# TODO add verified email authors = ["catenocrypt <13562139+catenocrypt@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
 rust-version = "1.67.0"
@@ -13,10 +14,14 @@ keywords = ["nostr", "nip-26",]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chacha20poly1305 = "0.10.1"
 dirs = "4.0.0"
 hex = "0.4.3"
 iced = "0.7.0"
 nostr = "0.18.1"
+rand_core = "0.6"
 readonly = "0.2.3"
+scrypt = "0.10.0"
 serde_json = "1.0.93"
 thiserror = "1.0"
+zeroize = "1.5"

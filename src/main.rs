@@ -1,4 +1,5 @@
 mod delegator;
+mod encrypt;
 mod error;
 mod keystore;
 mod keystr_model;
