@@ -1,6 +1,6 @@
-- Persist settings, security level
-- Confirmations on UI
-- Store keys encrypted
+- v0.5:
+ - Confirmations on UI
+ - desc in Readme
 - Show QR code for keys (pub)
 - Relay support -- list, connect, query, send, etc.
 - Status: for error, show popup

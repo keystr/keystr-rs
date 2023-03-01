@@ -5,9 +5,9 @@ Written in Rust, with simple UI (Iced).
 
 ## Features
 
-- Key management:
-  - Import of keys
-  - Save/Load keys
+- Safekeeping of keys:
+  - Import of keys (secret or public)
+  - Save/Load keys (encrypted with password)
 - Delegations: Create NIP-26 delegation
 
 ## Screenshot
@@ -16,9 +16,7 @@ Written in Rust, with simple UI (Iced).
 
 ## Roadmap
 
-- Safekeeping of keys
-- Delegation (NIP-26)
-- Profile
+- Profile metadata
 - Remote Signer (NIP-46)
 
 ## Building and Running
@@ -39,7 +37,7 @@ Create an issue, PR, or discussion.
 
 ## References
 
-- Protocol definition  https://github.com/nostr-protocol/nostr  protocol
+- Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
 
 - Nostr projects  https://github.com/aljazceru/awesome-nostr
 
