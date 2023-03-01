@@ -1,6 +1,6 @@
 [package]
 name = "keystr-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "An application for managing Nostr keys. Written in Rust, with simple UI (Iced)."
 homepage = "https://github.com/keystr/keystr-rs"
