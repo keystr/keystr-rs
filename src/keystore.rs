@@ -34,10 +34,17 @@ pub struct Keystore {
     has_unsaved_change: bool,
     keys: Keys,
     encrypted_secret_key: Option<Vec<u8>>,
+    pub hide_secret_key: bool,
     // Input for public key import
     pub public_key_input: String,
     // Input for secret key import
     pub secret_key_input: String,
+    // Input for encryption password, for decrypt
+    pub decrypt_password_input: String,
+    // Input for encryption password, for save
+    pub save_password_input: String,
+    // Input for repeat encryption password, for save
+    pub save_repeat_password_input: String,
 }
 
 /// Folder used to store data, relative to user home dir
@@ -55,14 +62,19 @@ impl Keystore {
             has_unsaved_change: false,
             keys: Keys::generate(), // placeholder value initially
             encrypted_secret_key: None,
+            hide_secret_key: true,
             public_key_input: String::new(),
             secret_key_input: String::new(),
+            decrypt_password_input: String::new(),
+            save_password_input: String::new(),
+            save_repeat_password_input: String::new(),
         }
     }
 
     /// Action to clear existing keys
     pub fn clear(&mut self) {
         self.keys = Keys::generate();
+        self.encrypted_secret_key = None;
         self.secret_key_set_state = SecretKeySetState::NotSet;
         self.public_key_set_state = PublicKeySetState::NotSet;
     }
@@ -70,6 +82,7 @@ impl Keystore {
     /// Generate new random keys
     pub fn generate(&mut self) {
         self.keys = Keys::generate();
+        self.encrypted_secret_key = None;
         self.secret_key_set_state = SecretKeySetState::Set;
         self.public_key_set_state = PublicKeySetState::Set;
         self.has_unsaved_change = true;
@@ -102,17 +115,14 @@ impl Keystore {
         self.encrypted_secret_key =
             Some(hex::decode(encrypted_key_str).map_err(|_e| Error::KeyInvalidEncrypted)?);
         self.secret_key_set_state = SecretKeySetState::SetEncrypted;
-        self.public_key_set_state = PublicKeySetState::Set;
+        self.public_key_set_state = PublicKeySetState::NotSet;
         self.has_unsaved_change = true;
         Ok(())
     }
 
-    /// Try to decrypt the already loaded encrypted key using the supplied password
+    /// Try to decrypt the already loaded encrypted key using the decryption password
     /// It is recommend to zeroize() the password after use.
     pub fn decrypt_secret_key(&mut self, password: &str) -> Result<(), Error> {
-        if self.secret_key_set_state != SecretKeySetState::SetEncrypted {
-            return Err(Error::KeyNotSet);
-        }
         let sk_bytes = match &self.encrypted_secret_key {
             None => return Err(Error::KeyNotSet),
             Some(d) => d,
@@ -129,7 +139,13 @@ impl Keystore {
             Err(_) => return Err(Error::KeyNotSet),
             Ok(sk) => sk,
         };
-        let password = "".to_string(); // TODO from outside
+
+        if self.save_password_input != self.save_repeat_password_input {
+            return Err(Error::KeyEncryptionPassword);
+        }
+        let password = &self.save_password_input;
+        // TODO check if password is OK, not missing, length, etc.
+
         Self::check_create_folder()?;
         let data = Encrypt::encrypt_key(&sk, &password, Encrypt::default_log2_rounds())?;
         let hex_string = hex::encode(data);
@@ -144,6 +160,7 @@ impl Keystore {
         }
         // write contents
         fs::write(path.as_path(), hex_string.to_string())?;
+
         Ok(())
     }
 
@@ -181,7 +198,7 @@ impl Keystore {
     pub fn load_secret_key(&mut self) -> Result<(), Error> {
         let sk_hex = fs::read_to_string(Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME))?;
         self.import_encrypted_secret_key(&sk_hex)?;
-        // Also try to decrypt with empty password, set it if successful
+        // Also try to decrypt with empty password, set it if successful, ignore if not
         let _ret = self.decrypt_secret_key("");
         Ok(())
     }
@@ -199,10 +216,11 @@ impl Keystore {
         let secret_path = Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME);
         if secret_path.as_path().is_file() {
             // secret key file exists, load secret key
-            return self.load_secret_key();
+            self.load_secret_key()
+        } else {
+            // load public key
+            self.load_public_key()
         }
-        // load public key
-        self.load_public_key()
     }
 
     fn full_folder_path() -> PathBuf {
@@ -228,7 +246,11 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     ///.Action to save secret key from file
-    pub fn save_action(&self, security_settings: &SecuritySettings, status: &mut StatusMessages) {
+    pub fn save_action(
+        &mut self,
+        security_settings: &SecuritySettings,
+        status: &mut StatusMessages,
+    ) {
         let res = if !security_settings.allows_persist() {
             Err(Error::KeySaveNotAllowed)
         } else {
@@ -238,6 +260,9 @@ impl Keystore {
             Err(e) => status.set_error_err(&e),
             Ok(ss) => {
                 if ss {
+                    // Clear password input
+                    self.save_password_input = "".to_string();
+                    self.save_repeat_password_input = "".to_string();
                     status.set("Secret key persisted to storage");
                 } else {
                     status.set("Public key persisted to storage");
@@ -261,7 +286,26 @@ impl Keystore {
         if let Err(e) = res {
             status.set_error_err(&e);
         } else {
-            status.set("Keys loaded from storage");
+            status.set("Keys loaded from storage (may need decryption with password)");
+        }
+    }
+
+    pub fn unlock_secret_key_action(
+        &mut self,
+        _security_settings: &SecuritySettings,
+        status: &mut StatusMessages,
+    ) {
+        // check if password is set if needed
+        match self.decrypt_secret_key(&self.decrypt_password_input.clone()) {
+            Err(e) => status.set(&format!(
+                "Could not decrypt secret key, check password! ({})",
+                e
+            )),
+            Ok(_) => {
+                // cleanup
+                self.decrypt_password_input = "".to_string();
+                status.set("Secret key decrypted")
+            }
         }
     }
 
@@ -271,6 +315,10 @@ impl Keystore {
 
     pub fn is_secret_key_set(&self) -> bool {
         self.secret_key_set_state == SecretKeySetState::Set
+    }
+
+    pub fn is_encrypted_secret_key_set(&self) -> bool {
+        self.encrypted_secret_key.is_some()
     }
 
     pub fn get_keys(&self) -> Result<Keys, Error> {
@@ -292,17 +340,20 @@ impl Keystore {
     }
 
     /// Warning: Security-sensitive method!
+    /// Return secret key as nsec string, if set, and if Hide option is not active.
     pub fn get_nsec(&self) -> String {
         if !self.is_secret_key_set() {
-            "".to_string()
-        } else {
-            match self.keys.secret_key() {
-                Err(_) => "(no secret key)".to_string(),
-                Ok(key) => match key.to_bech32() {
-                    Err(_) => "(conversion error)".to_string(),
-                    Ok(s) => s,
-                },
-            }
+            return "".to_string();
+        }
+        if self.hide_secret_key {
+            return "".to_string();
+        }
+        match self.keys.secret_key() {
+            Err(_) => "(no secret key)".to_string(),
+            Ok(key) => match key.to_bech32() {
+                Err(_) => "(conversion error)".to_string(),
+                Ok(s) => s,
+            },
         }
     }
 }
@@ -328,6 +379,7 @@ mod test {
         assert!(k.is_public_key_set());
         assert!(k.is_secret_key_set());
         assert!(k.get_npub().len() > 60);
+        k.hide_secret_key = false;
         assert!(k.get_nsec().len() > 60);
         assert!(k.get_keys().is_ok());
         assert_eq!(
@@ -343,6 +395,10 @@ mod test {
                 .unwrap(),
             k.get_nsec()
         );
+
+        // test hide option
+        k.hide_secret_key = true;
+        assert_eq!(k.get_nsec(), "".to_string());
     }
 
     #[test]
@@ -354,12 +410,13 @@ mod test {
         assert!(k.is_public_key_set());
         assert!(k.is_secret_key_set());
         assert_eq!(
-            k.get_nsec(),
-            "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"
-        );
-        assert_eq!(
             k.get_npub(),
             "npub1rfze4zn25ezp6jqt5ejlhrajrfx0az72ed7cwvq0spr22k9rlnjq93lmd4"
+        );
+        k.hide_secret_key = false;
+        assert_eq!(
+            k.get_nsec(),
+            "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"
         );
     }
 
@@ -369,6 +426,7 @@ mod test {
         let _res = k
             .import_secret_key("b2f3673ee3a659283e6599080e0ab0e669a3c2640914375a9b0b357faae08b17")
             .unwrap();
+        k.hide_secret_key = false;
         assert_eq!(
             k.get_nsec(),
             "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"

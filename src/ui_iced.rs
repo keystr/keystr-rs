@@ -19,7 +19,12 @@ pub enum Message {
     KeysLoad,
     KeysPubkeyInput(String),
     KeysPubkeyImport,
+    KeysToggleHideSecretKey,
     KeysSecretkeyInput(String),
+    KeysUnlock,
+    KeysDecryptPasswordInput(String),
+    KeysSavePasswordInput(String),
+    KeysSaveRepeatPasswordInput(String),
     KeysSecretkeyImport,
     DelegateDeeChanged(String),
     DelegateDeeGenerate,
@@ -31,6 +36,7 @@ pub enum Message {
     DelegateTimeDaysChangedNoUpdate(String),
     SecurityLevelChange(SecurityLevel),
     ChangedReadonly(String),
+    NoOp,
 }
 
 pub(crate) struct KeystrApp {
@@ -58,28 +64,115 @@ impl KeystrApp {
     }
 
     fn tab_keys(&self) -> Element<Message> {
+        let label_width = Length::Units(150);
+
+        let unlock_ui = if self.model.own_keys.is_encrypted_secret_key_set() {
+            column![
+                row![
+                text("Password is needed to unlock secret key:").size(15),
+                text_input(
+                    "enter password that was used for encrypting secret key",
+                    &self.model.own_keys.decrypt_password_input,
+                    Message::KeysDecryptPasswordInput,
+                )
+                .password()
+                .size(15),
+                button("Unlock").on_press(Message::KeysUnlock),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0)]
+        } else {
+            column![]
+        }
+        .align_items(Alignment::Fill)
+        .spacing(5)
+        .padding(0);
+
         column![
             text("Own Keys").size(25),
-            text("Public key (npub):").size(15),
-            text_input(
-                "npub public key",
-                &self.model.own_keys.get_npub(),
-                Message::ChangedReadonly,
-            )
-            .size(15),
-            text("Secret key (nsec):").size(15),
-            text_input(
-                "", // empty, placeholder also shows up asterisked
-                &self.model.own_keys.get_nsec(),
-                Message::ChangedReadonly,
-            )
-            .password()
-            .size(15),
+            unlock_ui,
             row![
-                button("Save").on_press(Message::KeysSave),
+                column![text("Public key (npub):").size(15)]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "npub public key",
+                    &self.model.own_keys.get_npub(),
+                    Message::ChangedReadonly,
+                )
+                .size(15),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            row![
+                column![text("Secret key (nsec):").size(15)]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                button("Copy TODO").on_press(Message::NoOp), // TODO, TODO confirm
+                button(if self.model.own_keys.hide_secret_key {
+                    "Show"
+                } else {
+                    "Hide"
+                })
+                .on_press(Message::KeysToggleHideSecretKey),
+                if self.model.own_keys.hide_secret_key {
+                    text_input("(hidden)", "(hidden)", Message::ChangedReadonly)
+                } else {
+                    text_input(
+                        "", // empty, placeholder also shows up asterisked
+                        &self.model.own_keys.get_nsec(),
+                        Message::ChangedReadonly,
+                    )
+                    .password()
+                }
+                .size(15),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
+            row![
                 button("Load").on_press(Message::KeysLoad),
+                button("Save").on_press(Message::KeysSave),
                 button("Generate new keypair").on_press(Message::KeysGenerate),
                 button("Clear keys").on_press(Message::KeysClear),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            text("Password to encrypt secret key:").size(15),
+            row![
+                column![text("Password:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "enter password for encrypting secret key",
+                    &self.model.own_keys.save_password_input,
+                    Message::KeysSavePasswordInput,
+                )
+                .password()
+                .size(15),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            row![
+                column![text("Repeat password:").size(15),]
+                    .align_items(Alignment::Start)
+                    .width(label_width)
+                    .padding(0),
+                text_input(
+                    "repeat password",
+                    &self.model.own_keys.save_repeat_password_input,
+                    Message::KeysSaveRepeatPasswordInput,
+                )
+                .password()
+                .size(15),
             ]
             .align_items(Alignment::Fill)
             .spacing(5)
@@ -331,6 +424,9 @@ impl Sandbox for KeystrApp {
                 .own_keys
                 .load_action(&self.model.security_settings, &mut self.model.status),
             Message::KeysPubkeyInput(s) => self.model.own_keys.public_key_input = s,
+            Message::KeysToggleHideSecretKey => {
+                self.model.own_keys.hide_secret_key = !self.model.own_keys.hide_secret_key
+            }
             Message::KeysPubkeyImport => {
                 match self
                     .model
@@ -344,6 +440,12 @@ impl Sandbox for KeystrApp {
                 self.model.own_keys.public_key_input = String::new();
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
+            Message::KeysUnlock => self.model.own_keys.unlock_secret_key_action(&self.model.security_settings, &mut self.model.status),
+            Message::KeysDecryptPasswordInput(s) => self.model.own_keys.decrypt_password_input = s,
+            Message::KeysSavePasswordInput(s) => self.model.own_keys.save_password_input = s,
+            Message::KeysSaveRepeatPasswordInput(s) => {
+                self.model.own_keys.save_repeat_password_input = s
+            }
             Message::KeysSecretkeyImport => {
                 match self
                     .model
@@ -392,6 +494,7 @@ impl Sandbox for KeystrApp {
             }
             Message::SecurityLevelChange(l) => self.model.security_settings.security_level = l,
             Message::ChangedReadonly(_s) => {}
+            Message::NoOp => {}
         }
     }
 
