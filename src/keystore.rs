@@ -2,37 +2,17 @@ use crate::encrypt::Encrypt;
 use crate::error::Error;
 use crate::keystr_model::StatusMessages;
 use crate::security_settings::SecuritySettings;
-use nostr::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
+use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
 
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(PartialEq)]
-pub enum SecretKeySetState {
-    /// No set, cannot sign
-    NotSet,
-    /// Loaded in encrypted form, cannot sign, needs to be decrypted (with optional password)
-    SetEncrypted,
-    /// Secret key is set, therefore public key as well, can also sign
-    Set,
-}
-
-#[derive(PartialEq)]
-pub enum PublicKeySetState {
-    /// No set, no identity
-    NotSet,
-    /// Public key is set
-    Set,
-}
-
 // Model for KeyStore part
 #[readonly::make]
 pub struct Keystore {
-    pub secret_key_set_state: SecretKeySetState,
-    pub public_key_set_state: PublicKeySetState,
     #[readonly]
     has_unsaved_change: bool,
-    keys: Keys,
+    keys: Option<Keys>,
     encrypted_secret_key: Option<Vec<u8>>,
     pub hide_secret_key: bool,
     // Input for public key import
@@ -57,10 +37,8 @@ const ENCRYPTED_SECRET_KEY_FILENAME: &str = ".ncrypt";
 impl Keystore {
     pub fn new() -> Self {
         Keystore {
-            secret_key_set_state: SecretKeySetState::NotSet,
-            public_key_set_state: PublicKeySetState::NotSet,
             has_unsaved_change: false,
-            keys: Keys::generate(), // placeholder value initially
+            keys: None,
             encrypted_secret_key: None,
             hide_secret_key: true,
             public_key_input: String::new(),
@@ -73,27 +51,21 @@ impl Keystore {
 
     /// Action to clear existing keys
     pub fn clear(&mut self) {
-        self.keys = Keys::generate();
+        self.keys = None;
         self.encrypted_secret_key = None;
-        self.secret_key_set_state = SecretKeySetState::NotSet;
-        self.public_key_set_state = PublicKeySetState::NotSet;
     }
 
     /// Generate new random keys
     pub fn generate(&mut self) {
-        self.keys = Keys::generate();
+        self.keys = Some(Keys::generate());
         self.encrypted_secret_key = None;
-        self.secret_key_set_state = SecretKeySetState::Set;
-        self.public_key_set_state = PublicKeySetState::Set;
         self.has_unsaved_change = true;
     }
 
     /// Import public key only, in 'npub' bech32 or hex format. Signing will not be possible.
     pub fn import_public_key(&mut self, public_key_str: &str) -> Result<(), Error> {
         self.clear();
-        self.keys = Keys::from_pk_str(public_key_str)?;
-        self.secret_key_set_state = SecretKeySetState::NotSet;
-        self.public_key_set_state = PublicKeySetState::Set;
+        self.keys = Some(Keys::from_pk_str(public_key_str)?);
         self.has_unsaved_change = true;
         Ok(())
     }
@@ -102,9 +74,7 @@ impl Keystore {
     /// Import secret key, in 'nsec' bech32 or hex format (pubkey is derived from it)
     pub fn import_secret_key(&mut self, secret_key_str: &str) -> Result<(), Error> {
         self.clear();
-        self.keys = Keys::from_sk_str(secret_key_str)?;
-        self.secret_key_set_state = SecretKeySetState::Set;
-        self.public_key_set_state = PublicKeySetState::Set;
+        self.keys = Some(Keys::from_sk_str(secret_key_str)?);
         self.has_unsaved_change = true;
         Ok(())
     }
@@ -114,8 +84,6 @@ impl Keystore {
         self.clear();
         self.encrypted_secret_key =
             Some(hex::decode(encrypted_key_str).map_err(|_e| Error::KeyInvalidEncrypted)?);
-        self.secret_key_set_state = SecretKeySetState::SetEncrypted;
-        self.public_key_set_state = PublicKeySetState::NotSet;
         self.has_unsaved_change = true;
         Ok(())
     }
@@ -133,12 +101,8 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     /// Save secret key to file.
-    /// It is recommend to zeroize() the password after use.
     pub fn save_encrypted_secret_key(&self) -> Result<(), Error> {
-        let sk = match self.keys.secret_key() {
-            Err(_) => return Err(Error::KeyNotSet),
-            Ok(sk) => sk,
-        };
+        let sk = self.get_secret_key()?;
 
         if self.save_password_input != self.save_repeat_password_input {
             return Err(Error::KeyEncryptionPassword);
@@ -166,11 +130,9 @@ impl Keystore {
 
     /// Save publick key to file.
     pub fn save_public_key(&self) -> Result<(), Error> {
-        if !self.is_public_key_set() {
-            return Err(Error::KeyNotSet);
-        }
+        let pubkey = self.get_public_key()?;
         Self::check_create_folder()?;
-        let npub_string = self.keys.public_key().to_bech32()?;
+        let npub_string = pubkey.to_bech32()?;
         fs::write(Self::full_file_path(PUBLIC_KEY_FILENAME), npub_string)?;
         Ok(())
     }
@@ -309,51 +271,61 @@ impl Keystore {
         }
     }
 
+    #[cfg(test)]
     pub fn is_public_key_set(&self) -> bool {
-        self.public_key_set_state == PublicKeySetState::Set
+        self.get_public_key().is_ok()
     }
 
     pub fn is_secret_key_set(&self) -> bool {
-        self.secret_key_set_state == SecretKeySetState::Set
+        self.get_secret_key().is_ok()
     }
 
     pub fn is_encrypted_secret_key_set(&self) -> bool {
         self.encrypted_secret_key.is_some()
     }
 
-    pub fn get_keys(&self) -> Result<Keys, Error> {
-        if !self.is_secret_key_set() {
-            return Err(Error::KeyNotSet);
+    /// Warning: Security-sensitive method!
+    pub(crate) fn get_keys(&self) -> Result<&Keys, Error> {
+        match &self.keys {
+            None => Err(Error::KeyNotSet),
+            Some(kk) => Ok(kk),
         }
-        Ok(self.keys.clone())
+    }
+
+    fn get_public_key(&self) -> Result<XOnlyPublicKey, Error> {
+        Ok(self.get_keys()?.public_key())
+    }
+
+    /// Warning: Security-sensitive method!
+    fn get_secret_key(&self) -> Result<SecretKey, Error> {
+        Ok(self.get_keys()?.secret_key()?)
     }
 
     pub fn get_npub(&self) -> String {
-        if !self.is_public_key_set() {
-            "(not set)".to_string()
-        } else {
-            match self.keys.public_key().to_bech32() {
+        match self.get_public_key() {
+            Err(_e) => "(not set)".to_string(),
+            Ok(pk) => match pk.to_bech32() {
                 Err(_) => "(conversion error)".to_string(),
                 Ok(s) => s,
-            }
+            },
         }
     }
 
     /// Warning: Security-sensitive method!
     /// Return secret key as nsec string, if set, and if Hide option is not active.
     pub fn get_nsec(&self) -> String {
-        if !self.is_secret_key_set() {
-            return "".to_string();
-        }
-        if self.hide_secret_key {
-            return "".to_string();
-        }
-        match self.keys.secret_key() {
-            Err(_) => "(no secret key)".to_string(),
-            Ok(key) => match key.to_bech32() {
-                Err(_) => "(conversion error)".to_string(),
-                Ok(s) => s,
-            },
+        match self.get_secret_key() {
+            Err(_) => "(not set)".to_string(),
+            Ok(key) => {
+                if self.hide_secret_key {
+                    "".to_string()
+                } else {
+                    match key.to_bech32() {
+                        Err(_) => "(conversion error)".to_string(),
+                        Ok(s) => s,
+                    }
+                }
+            }
         }
     }
 }
@@ -368,7 +340,7 @@ mod test {
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
         assert_eq!(k.get_npub(), "(not set)");
-        assert_eq!(k.get_nsec(), "");
+        assert_eq!(k.get_nsec(), "(not set)");
         assert!(k.get_keys().is_err());
     }
 

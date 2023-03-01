@@ -67,8 +67,7 @@ impl KeystrApp {
         let label_width = Length::Units(150);
 
         let unlock_ui = if self.model.own_keys.is_encrypted_secret_key_set() {
-            column![
-                row![
+            column![row![
                 text("Password is needed to unlock secret key:").size(15),
                 text_input(
                     "enter password that was used for encrypting secret key",
@@ -440,7 +439,10 @@ impl Sandbox for KeystrApp {
                 self.model.own_keys.public_key_input = String::new();
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
-            Message::KeysUnlock => self.model.own_keys.unlock_secret_key_action(&self.model.security_settings, &mut self.model.status),
+            Message::KeysUnlock => self
+                .model
+                .own_keys
+                .unlock_secret_key_action(&self.model.security_settings, &mut self.model.status),
             Message::KeysDecryptPasswordInput(s) => self.model.own_keys.decrypt_password_input = s,
             Message::KeysSavePasswordInput(s) => self.model.own_keys.save_password_input = s,
             Message::KeysSaveRepeatPasswordInput(s) => {
