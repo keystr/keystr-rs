@@ -1,26 +1,39 @@
-use crate::{error::Error, keystr_model::StatusMessages, security_settings::SecuritySettings};
+use crate::encrypt::Encrypt;
+use crate::error::Error;
+use crate::keystr_model::StatusMessages;
+use crate::security_settings::SecuritySettings;
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, ToBech32};
 
 use std::fs;
 use std::path::PathBuf;
 
 #[derive(PartialEq)]
-pub enum KeysSetState {
-    /// No keys set
+pub enum SecretKeySetState {
+    /// No set, cannot sign
     NotSet,
-    /// Only public key is set, cannot sign
-    PublicOnly,
-    /// Secret key is set, therefore public key as well; can also sign
-    SecretAndPublic,
+    /// Loaded in encrypted form, cannot sign, needs to be decrypted (with optional password)
+    SetEncrypted,
+    /// Secret key is set, therefore public key as well, can also sign
+    Set,
+}
+
+#[derive(PartialEq)]
+pub enum PublicKeySetState {
+    /// No set, no identity
+    NotSet,
+    /// Public key is set
+    Set,
 }
 
 // Model for KeyStore part
 #[readonly::make]
 pub struct Keystore {
-    pub set_level: KeysSetState,
+    pub secret_key_set_state: SecretKeySetState,
+    pub public_key_set_state: PublicKeySetState,
     #[readonly]
     has_unsaved_change: bool,
     keys: Keys,
+    encrypted_secret_key: Option<Vec<u8>>,
     // Input for public key import
     pub public_key_input: String,
     // Input for secret key import
@@ -31,15 +44,17 @@ pub struct Keystore {
 const LOCAL_STORAGE_FOLDER: &str = ".keystr";
 /// Public key storage file name, relative to folder.
 const PUBLIC_KEY_FILENAME: &str = "npub";
-/// Secret key storage file name, relative to folder.
-const SECRET_KEY_FILENAME: &str = ".nsec";
+/// Encrypted secret key storage file name, relative to folder.
+const ENCRYPTED_SECRET_KEY_FILENAME: &str = ".ncrypt";
 
 impl Keystore {
     pub fn new() -> Self {
         Keystore {
-            set_level: KeysSetState::NotSet,
+            secret_key_set_state: SecretKeySetState::NotSet,
+            public_key_set_state: PublicKeySetState::NotSet,
             has_unsaved_change: false,
             keys: Keys::generate(), // placeholder value initially
+            encrypted_secret_key: None,
             public_key_input: String::new(),
             secret_key_input: String::new(),
         }
@@ -48,13 +63,15 @@ impl Keystore {
     /// Action to clear existing keys
     pub fn clear(&mut self) {
         self.keys = Keys::generate();
-        self.set_level = KeysSetState::NotSet;
+        self.secret_key_set_state = SecretKeySetState::NotSet;
+        self.public_key_set_state = PublicKeySetState::NotSet;
     }
 
     /// Generate new random keys
     pub fn generate(&mut self) {
         self.keys = Keys::generate();
-        self.set_level = KeysSetState::SecretAndPublic;
+        self.secret_key_set_state = SecretKeySetState::Set;
+        self.public_key_set_state = PublicKeySetState::Set;
         self.has_unsaved_change = true;
     }
 
@@ -62,7 +79,8 @@ impl Keystore {
     pub fn import_public_key(&mut self, public_key_str: &str) -> Result<(), Error> {
         self.clear();
         self.keys = Keys::from_pk_str(public_key_str)?;
-        self.set_level = KeysSetState::PublicOnly;
+        self.secret_key_set_state = SecretKeySetState::NotSet;
+        self.public_key_set_state = PublicKeySetState::Set;
         self.has_unsaved_change = true;
         Ok(())
     }
@@ -72,20 +90,50 @@ impl Keystore {
     pub fn import_secret_key(&mut self, secret_key_str: &str) -> Result<(), Error> {
         self.clear();
         self.keys = Keys::from_sk_str(secret_key_str)?;
-        self.set_level = KeysSetState::SecretAndPublic;
+        self.secret_key_set_state = SecretKeySetState::Set;
+        self.public_key_set_state = PublicKeySetState::Set;
         self.has_unsaved_change = true;
         Ok(())
     }
 
     /// Warning: Security-sensitive method!
-    /// Save secret key to file.
-    pub fn save_secret_key(&self) -> Result<(), Error> {
-        if !self.is_secret_key_set() {
+    pub fn import_encrypted_secret_key(&mut self, encrypted_key_str: &str) -> Result<(), Error> {
+        self.clear();
+        self.encrypted_secret_key =
+            Some(hex::decode(encrypted_key_str).map_err(|_e| Error::KeyInvalidEncrypted)?);
+        self.secret_key_set_state = SecretKeySetState::SetEncrypted;
+        self.public_key_set_state = PublicKeySetState::Set;
+        self.has_unsaved_change = true;
+        Ok(())
+    }
+
+    /// Try to decrypt the already loaded encrypted key using the supplied password
+    /// It is recommend to zeroize() the password after use.
+    pub fn decrypt_secret_key(&mut self, password: &str) -> Result<(), Error> {
+        if self.secret_key_set_state != SecretKeySetState::SetEncrypted {
             return Err(Error::KeyNotSet);
         }
+        let sk_bytes = match &self.encrypted_secret_key {
+            None => return Err(Error::KeyNotSet),
+            Some(d) => d,
+        };
+        let sk = Encrypt::decrypt_key(&sk_bytes, &password)?;
+        self.import_secret_key(&sk.to_bech32()?)
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Save secret key to file.
+    /// It is recommend to zeroize() the password after use.
+    pub fn save_encrypted_secret_key(&self) -> Result<(), Error> {
+        let sk = match self.keys.secret_key() {
+            Err(_) => return Err(Error::KeyNotSet),
+            Ok(sk) => sk,
+        };
+        let password = "".to_string(); // TODO from outside
         Self::check_create_folder()?;
-        let hex_string = hex::encode(self.keys.secret_key()?.secret_bytes());
-        let path = Self::full_file_path(SECRET_KEY_FILENAME);
+        let data = Encrypt::encrypt_key(&sk, &password, Encrypt::default_log2_rounds())?;
+        let hex_string = hex::encode(data);
+        let path = Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME);
         // create empty file
         fs::write(path.as_path(), "")?;
         // set permissions, TODO make it on non-unix as well
@@ -121,7 +169,7 @@ impl Keystore {
         self.save_public_key()?;
         // save secret key if set
         if self.is_secret_key_set() {
-            self.save_secret_key()?;
+            self.save_encrypted_secret_key()?;
             Ok(true)
         } else {
             Ok(false)
@@ -131,8 +179,10 @@ impl Keystore {
     /// Warning: Security-sensitive method!
     /// Load secret key from file
     pub fn load_secret_key(&mut self) -> Result<(), Error> {
-        let sk_hex = fs::read_to_string(Self::full_file_path(SECRET_KEY_FILENAME))?;
-        self.import_secret_key(&sk_hex)?;
+        let sk_hex = fs::read_to_string(Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME))?;
+        self.import_encrypted_secret_key(&sk_hex)?;
+        // Also try to decrypt with empty password, set it if successful
+        let _ret = self.decrypt_secret_key("");
         Ok(())
     }
 
@@ -146,7 +196,7 @@ impl Keystore {
     /// Warning: Security-sensitive method!
     /// Load public/secret key from file
     pub fn load_keys(&mut self) -> Result<(), Error> {
-        let secret_path  = Self::full_file_path(SECRET_KEY_FILENAME);
+        let secret_path = Self::full_file_path(ENCRYPTED_SECRET_KEY_FILENAME);
         if secret_path.as_path().is_file() {
             // secret key file exists, load secret key
             return self.load_secret_key();
@@ -170,7 +220,7 @@ impl Keystore {
     fn check_create_folder() -> Result<(), Error> {
         let p = Self::full_folder_path();
         if p.is_dir() {
-            return Ok(())
+            return Ok(());
         }
         fs::create_dir(p)?;
         Ok(())
@@ -178,11 +228,7 @@ impl Keystore {
 
     /// Warning: Security-sensitive method!
     ///.Action to save secret key from file
-    pub fn save_action(
-        &self,
-        security_settings: &SecuritySettings,
-        status: &mut StatusMessages,
-    ) {
+    pub fn save_action(&self, security_settings: &SecuritySettings, status: &mut StatusMessages) {
         let res = if !security_settings.allows_persist() {
             Err(Error::KeySaveNotAllowed)
         } else {
@@ -190,11 +236,13 @@ impl Keystore {
         };
         match res {
             Err(e) => status.set_error_err(&e),
-            Ok(ss) => if ss {
-                status.set("Secret key persisted to storage");
-            } else {
-                status.set("Public key persisted to storage");
-            },
+            Ok(ss) => {
+                if ss {
+                    status.set("Secret key persisted to storage");
+                } else {
+                    status.set("Public key persisted to storage");
+                }
+            }
         }
     }
 
@@ -218,11 +266,11 @@ impl Keystore {
     }
 
     pub fn is_public_key_set(&self) -> bool {
-        self.set_level != KeysSetState::NotSet
+        self.public_key_set_state == PublicKeySetState::Set
     }
 
     pub fn is_secret_key_set(&self) -> bool {
-        self.set_level == KeysSetState::SecretAndPublic
+        self.secret_key_set_state == SecretKeySetState::Set
     }
 
     pub fn get_keys(&self) -> Result<Keys, Error> {

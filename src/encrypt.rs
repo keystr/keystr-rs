@@ -1,18 +1,20 @@
 use crate::error::Error;
-use nostr::prelude::SecretKey;
 use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit, Payload},
     XChaCha20Poly1305,
 };
+use nostr::prelude::SecretKey;
 use rand_core::{OsRng, RngCore};
 use zeroize::Zeroize;
 
 /// Two-way encryption, used for secret keys
-struct Encrypt {}
-
-const DEFAULT_LOG_N: u8 = 13;
+pub(crate) struct Encrypt {}
 
 impl Encrypt {
+    pub(crate) fn default_log2_rounds() -> u8 {
+        13
+    }
+
     /// Encrypt a key.
     /// It is recommend to zeroize() the password after use.
     pub(crate) fn encrypt_key(
@@ -63,7 +65,7 @@ impl Encrypt {
         concat.extend(nonce); // 24 bytes of nonce
         concat.extend(associated_data); // 1 byte of key security
         concat.extend(ciphertext); // 48 bytes of ciphertext expected
-        // Total length is 91 = 1 + 1 + 16 + 24 + 1 + 32
+                                   // Total length is 91 = 1 + 1 + 16 + 24 + 1 + 32
 
         Ok(concat)
     }
@@ -163,6 +165,9 @@ mod test {
         let password = "password".to_string();
 
         let decrypted = Encrypt::decrypt_key(&encrypted, &password).unwrap();
-        assert_eq!(decrypted.to_bech32().unwrap(), "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae");
+        assert_eq!(
+            decrypted.to_bech32().unwrap(),
+            "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae"
+        );
     }
 }
