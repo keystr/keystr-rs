@@ -37,12 +37,9 @@ Create an issue, PR, or discussion.
 
 ## References
 
-- Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
-
-- Nostr projects  https://github.com/aljazceru/awesome-nostr
-
-- NIP-26 Delegations  https://github.com/nostr-protocol/nips/blob/master/26.md
-
+- NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
+- NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
 - Rust-nostr lib  https://github.com/rust-nostr/nostr
-
 - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
+- Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
+- Nostr projects  https://github.com/aljazceru/awesome-nostr
