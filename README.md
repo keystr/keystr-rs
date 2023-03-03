@@ -43,3 +43,7 @@ Create an issue, PR, or discussion.
 - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
 - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
 - Nostr projects  https://github.com/aljazceru/awesome-nostr
+
+## Contact
+
+Nostr: optout@nostrplebs.com npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflslh9jvqqd3lecx

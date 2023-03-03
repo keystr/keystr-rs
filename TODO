@@ -1,13 +1,18 @@
 - v0.5:
+ - [ui] Status: for error, show popup
  - Confirmations on UI
  - desc in Readme
+- v0.6:
+ - Relay support
+ - Signer
+- v0.9:
+ - Nostr Connect support
 - Show QR code for keys (pub)
 - Relay support -- list, connect, query, send, etc.
-- Status: for error, show popup
 - Nostr Connect support
 - Make Copy button work (copy to clipboard)
 - Import mnemonic
 - [UI] Action to show more logs
-- [Code org] move module part to separate module (later separate crate)
+- [code org] move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
 - Multiple identities (main, etc.)
