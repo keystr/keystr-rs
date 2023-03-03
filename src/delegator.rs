@@ -1,8 +1,8 @@
 use crate::error::Error;
-use crate::nostr_lib::{create_delegation_tag, delegation_token};
 
-use nostr::prelude::{FromBech32, Keys, ToBech32, XOnlyPublicKey};
+use nostr::prelude::{Conditions, DelegationTag, DelegationToken, FromBech32, Keys, ToBech32, XOnlyPublicKey};
 
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Model for Delegator
@@ -59,7 +59,8 @@ impl Delegator {
 
         let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone())?;
 
-        self.delegation_string = delegation_token(&delegatee_key, &self.conditions);
+        let conditions_struct = Conditions::from_str(&self.conditions)?;
+        self.delegation_string = DelegationToken::new(delegatee_key, conditions_struct).to_string();
         Ok(())
     }
 
@@ -108,9 +109,9 @@ impl Delegator {
         self.validate_and_update()?;
         let delegatee_key = XOnlyPublicKey::from_bech32(self.delegatee_npub_input.clone())?;
 
-        let tag = create_delegation_tag(&keys, delegatee_key, &self.conditions.clone())?;
+        let tag = DelegationTag::new(&keys, delegatee_key, Conditions::from_str(&self.conditions.clone())?)?;
         self.delegation_tag = tag.to_string();
-        self.signature = tag.get_signature().to_string();
+        self.signature = tag.signature().to_string();
         Ok(())
     }
 }

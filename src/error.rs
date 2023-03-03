@@ -33,9 +33,6 @@ pub enum Error {
     /// Encryption passwords don't match
     #[error("Encryption passwords don't match")]
     KeyEncryptionPasswordMismatch,
-    /// NostrLib error
-    #[error(transparent)]
-    NostrLibError(#[from] crate::nostr_lib::Error),
     /// Nip19 error
     #[error(transparent)]
     SignatureError(#[from] nostr::nips::nip19::Error),
