@@ -1,7 +1,7 @@
 use crate::encrypt::Encrypt;
 use crate::error::Error;
-use crate::keystr_model::StatusMessages;
 use crate::security_settings::{SecurityLevel, SecuritySettings};
+use crate::status_messages::StatusMessages;
 use crate::storage::Storage;
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
 
@@ -9,7 +9,7 @@ use std::fs;
 
 // Model for KeyStore part
 #[readonly::make]
-pub struct Keystore {
+pub(crate) struct Keystore {
     #[readonly]
     has_unsaved_change: bool,
     keys: Option<Keys>,

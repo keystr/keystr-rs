@@ -7,6 +7,7 @@ mod keystr_model;
 // mod nostr_lib;
 mod security_settings;
 mod settings;
+mod status_messages;
 mod storage;
 mod ui_iced;
 
