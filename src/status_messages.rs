@@ -18,6 +18,8 @@ impl StatusMessages {
             self.status_lines.remove(0);
         }
         self.status_lines.push(s.to_string());
+        // also print on stdout
+        println!("| {}", s);
     }
 
     pub fn set_error(&mut self, es: &str) {
