@@ -4,6 +4,7 @@ mod ui;
 use crate::ui::ui_iced::KeystrApp;
 use iced::{Sandbox, Settings};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let _res = KeystrApp::run(Settings::default());
 }

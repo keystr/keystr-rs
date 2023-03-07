@@ -8,6 +8,7 @@ use iced::{Alignment, Element, Length, Sandbox};
 pub enum Tab {
     Keys,
     Delegate,
+    Signer,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +28,7 @@ pub(crate) enum Message {
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
     SecurityLevelChange(SecurityLevel),
+    SignerUriInput(String),
     ChangedReadonly(String),
     NoOp,
 }
@@ -48,6 +50,7 @@ impl KeystrApp {
         row![
             button("Keys").on_press(Message::TabSelect(Tab::Keys)),
             button("Delegate").on_press(Message::TabSelect(Tab::Delegate)),
+            button("Signer").on_press(Message::TabSelect(Tab::Signer)),
         ]
         .padding(10)
         .spacing(5)
@@ -357,6 +360,30 @@ impl KeystrApp {
         .into()
     }
 
+    fn tab_signer(&self) -> Element<Message> {
+        column![
+            text("Signer").size(25),
+            text("Enter NConnect URI:").size(15),
+            row![
+                text_input(
+                    "Nostr Connect URI",
+                    &self.model.signer.connect_uri_input,
+                    Message::SignerUriInput,
+                )
+                .size(15),
+                button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+            ]
+            .align_items(Alignment::Center)
+            .spacing(5)
+            .padding(0),
+        ]
+        .align_items(Alignment::Fill)
+        .spacing(5)
+        .padding(20)
+        .max_width(600)
+        .into()
+    }
+
     fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {
         container(
             column![
@@ -405,6 +432,7 @@ impl KeystrApp {
                 match self.current_tab {
                     Tab::Keys => self.tab_keys(),
                     Tab::Delegate => self.tab_delegate(),
+                    Tab::Signer => self.tab_signer(),
                 },
                 iced::widget::rule::Rule::horizontal(5),
             ]
@@ -483,6 +511,7 @@ impl Sandbox for KeystrApp {
                 self.model.delegator.time_cond_days = s;
             }
             Message::SecurityLevelChange(l) => self.model.settings.set_security_level(l),
+            Message::SignerUriInput(s) => self.model.signer.connect_uri_input = s,
             Message::ChangedReadonly(_s) => {}
             Message::NoOp => {}
         }
