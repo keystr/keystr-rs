@@ -1,4 +1,4 @@
-use crate::{
+use crate::model::{
     delegator::Delegator, keystore::Keystore, settings::Settings, status_messages::StatusMessages,
 };
 

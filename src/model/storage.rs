@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::model::error::Error;
 use std::fs;
 use std::path::PathBuf;
 

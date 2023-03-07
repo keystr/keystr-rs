@@ -1,8 +1,8 @@
-use crate::encrypt::Encrypt;
-use crate::error::Error;
-use crate::security_settings::{SecurityLevel, SecuritySettings};
-use crate::status_messages::StatusMessages;
-use crate::storage::Storage;
+use crate::model::encrypt::Encrypt;
+use crate::model::error::Error;
+use crate::model::security_settings::{SecurityLevel, SecuritySettings};
+use crate::model::status_messages::StatusMessages;
+use crate::model::storage::Storage;
 use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
 
 use std::fs;

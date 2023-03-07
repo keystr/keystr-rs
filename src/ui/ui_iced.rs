@@ -1,5 +1,5 @@
-use crate::keystr_model::{Action, Confirmation, KeystrModel};
-use crate::security_settings::{SecurityLevel, SECURITY_LEVELS};
+use crate::model::keystr_model::{Action, Confirmation, KeystrModel};
+use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};

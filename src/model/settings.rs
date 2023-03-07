@@ -1,6 +1,6 @@
-use crate::error::Error;
-use crate::security_settings::{SecurityLevel, SecuritySettings};
-use crate::storage::Storage;
+use crate::model::error::Error;
+use crate::model::security_settings::{SecurityLevel, SecuritySettings};
+use crate::model::storage::Storage;
 use serde::{Deserialize, Serialize};
 use std::fs;
 

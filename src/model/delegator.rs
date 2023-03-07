@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::model::error::Error;
 
 use nostr::prelude::{
     Conditions, DelegationTag, DelegationToken, FromBech32, Keys, ToBech32, XOnlyPublicKey,
