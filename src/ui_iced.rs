@@ -64,7 +64,7 @@ impl KeystrApp {
     }
 
     fn tab_keys(&self) -> Element<Message> {
-        let label_width = Length::Units(150);
+        let label_width = Length::Fixed(150.0);
 
         let unlock_ui = if self.model.own_keys.is_encrypted_secret_key_set() {
             column![row![
@@ -219,7 +219,7 @@ impl KeystrApp {
     }
 
     fn tab_delegate(&self) -> Element<Message> {
-        let label_width = Length::Units(150);
+        let label_width = Length::Fixed(150.0);
         column![
             text("Delegate").size(25),
             text("Delegatee -- npub to delegate to:").size(15),
