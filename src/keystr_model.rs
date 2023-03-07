@@ -14,6 +14,13 @@ pub(crate) enum Action {
     KeysLoad,
     KeysSave,
     KeysUnlock,
+    ConfirmationYes,
+    ConfirmationNo,
+}
+
+#[derive(Clone)]
+pub(crate) enum Confirmation {
+    KeysClearBeforeAction(Option<Action>),
 }
 
 pub(crate) struct KeystrModel {
@@ -21,16 +28,23 @@ pub(crate) struct KeystrModel {
     pub delegator: Delegator,
     pub status: StatusMessages,
     pub settings: Settings,
+    pub confirmation_dialog: Option<Confirmation>,
 }
 
 impl KeystrModel {
     pub fn new() -> Self {
-        let mut model = Self {
+        Self {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
             status: StatusMessages::new(),
             settings: Settings::default(),
-        };
+            confirmation_dialog: None,
+        }
+    }
+
+    // Create and init model
+    pub fn init() -> Self {
+        let mut model = Self::new();
         model.status.set("Keystr started");
         //. Try load settings
         if let Ok(sett) = Settings::load() {
@@ -38,10 +52,8 @@ impl KeystrModel {
         }
         //. Try load keys
         if model.settings.security.allows_persist() {
-            let _res = model
-                .own_keys
-                .load_action(&model.settings.security, &mut model.status);
-        }
+            model.action(Action::KeysLoad);
+}
         model
     }
 
@@ -62,13 +74,22 @@ impl KeystrModel {
                 self.status.set("Keys cleared");
             }
             Action::KeysClear => {
-                // TODO confirmation
-                self.action(Action::KeysClearNoConfirm);
+                if self.own_keys.keys_is_set() {
+                    self.confirmation_dialog = Some(Confirmation::KeysClearBeforeAction(None));
+                } else {
+                    self.action(Action::KeysClearNoConfirm);
+                }
             }
             Action::KeysGenerate => {
-                // TODO confirmation
-                self.own_keys.generate();
-                self.status.set("New keypair generated");
+                if self.own_keys.keys_is_set() {
+                    self.confirmation_dialog = Some(Confirmation::KeysClearBeforeAction(Some(
+                        Action::KeysGenerate,
+                    )));
+                } else {
+                    self.confirmation_dialog = None;
+                    self.own_keys.generate();
+                    self.status.set("New keypair generated");
+                }
             }
             Action::KeysImportPubkey => {
                 match self
@@ -85,8 +106,13 @@ impl KeystrModel {
                 self.own_keys.import_secret_key_action(&mut self.status);
             }
             Action::KeysLoad => {
-                self.own_keys
-                    .load_action(&self.settings.security, &mut self.status);
+                if self.own_keys.keys_is_set() {
+                    self.confirmation_dialog =
+                        Some(Confirmation::KeysClearBeforeAction(Some(Action::KeysLoad)));
+                } else {
+                    self.own_keys
+                        .load_action(&self.settings.security, &mut self.status);
+                }
             }
             Action::KeysSave => {
                 self.own_keys
@@ -95,6 +121,61 @@ impl KeystrModel {
             Action::KeysUnlock => self
                 .own_keys
                 .unlock_secret_key_action(&self.settings.security, &mut self.status),
+            Action::ConfirmationYes => {
+                let prev_confirmation = self.confirmation_dialog.clone();
+                self.confirmation_dialog = None;
+                self.action(Action::KeysClearNoConfirm);
+                if let Some(Confirmation::KeysClearBeforeAction(Some(next_action))) =
+                    prev_confirmation
+                {
+                    self.action(next_action);
+                }
+            }
+            Action::ConfirmationNo => {
+                self.confirmation_dialog = None;
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_clear_generate_confirmation() {
+        let mut m = KeystrModel::new();
+        assert_eq!(m.own_keys.keys_is_set(), false);
+        assert!(m.confirmation_dialog.is_none());
+
+        // generate
+        m.action(Action::KeysGenerate);
+        assert_eq!(m.own_keys.keys_is_set(), true);
+        assert!(m.confirmation_dialog.is_none());
+
+        // clear requires confirmation
+        m.action(Action::KeysClear);
+        assert_eq!(m.own_keys.keys_is_set(), true);
+        assert!(m.confirmation_dialog.is_some());
+
+        // confirmation No does not change it
+        m.action(Action::ConfirmationNo);
+        assert_eq!(m.own_keys.keys_is_set(), true);
+        assert!(m.confirmation_dialog.is_none());
+
+        // clear requires confirmation
+        m.action(Action::KeysClear);
+        assert_eq!(m.own_keys.keys_is_set(), true);
+        assert!(m.confirmation_dialog.is_some());
+
+        // confirmation Yes performs clean
+        m.action(Action::ConfirmationYes);
+        assert_eq!(m.own_keys.keys_is_set(), false);
+        assert!(m.confirmation_dialog.is_none());
+
+        // clear works now
+        m.action(Action::KeysClear);
+        assert_eq!(m.own_keys.keys_is_set(), false);
+        assert!(m.confirmation_dialog.is_none());
     }
 }

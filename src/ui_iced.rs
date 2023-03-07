@@ -1,6 +1,7 @@
-use crate::keystr_model::{Action, KeystrModel};
+use crate::keystr_model::{Action, Confirmation, KeystrModel};
 use crate::security_settings::{SecurityLevel, SECURITY_LEVELS};
-use iced::widget::{button, column, pick_list, row, text, text_input};
+use crate::ui::dialog::Dialog;
+use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +39,7 @@ pub(crate) struct KeystrApp {
 impl KeystrApp {
     pub fn new() -> Self {
         Self {
-            model: KeystrModel::new(),
+            model: KeystrModel::init(),
             current_tab: Tab::Keys,
         }
     }
@@ -356,34 +357,75 @@ impl KeystrApp {
         .into()
     }
 
-    fn view(&self) -> Element<Message> {
-        column![
-            text("Nostr Keystore").size(25),
-            iced::widget::rule::Rule::horizontal(5),
-            text("Check the warnings and set your security level below:").size(20),
-            text(&self.model.settings.security.get_security_warning_secret()).size(15),
-            pick_list(
-                SECURITY_LEVELS,
-                Some(self.model.settings.security.security_level),
-                Message::SecurityLevelChange
-            )
-            .text_size(15),
-            iced::widget::rule::Rule::horizontal(5),
-            self.tab_selector(),
-            iced::widget::rule::Rule::horizontal(5),
-            text(&format!("| {}", &self.model.status.get_last_n(3))).size(15),
-            text(&format!("| {}", &self.model.status.get_last_n(2))).size(15),
-            text(&format!("| {}", &self.model.status.get_last())).size(15),
-            iced::widget::rule::Rule::horizontal(5),
-            match self.current_tab {
-                Tab::Keys => self.tab_keys(),
-                Tab::Delegate => self.tab_delegate(),
-            },
-            iced::widget::rule::Rule::horizontal(5),
-        ]
+    fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {
+        container(
+            column![
+                text("Remove exiting keys?").size(25),
+                row![
+                    button("Yes").on_press(Message::ModelAction(Action::ConfirmationYes)),
+                    button("No").on_press(Message::ModelAction(Action::ConfirmationNo)),
+                ]
+                .align_items(Alignment::Fill)
+                .width(Length::Fill)
+                .spacing(5)
+                .padding(0),
+                iced::widget::rule::Rule::horizontal(5),
+            ]
+            .align_items(Alignment::Fill)
+            .width(Length::Fill)
+            .spacing(5)
+            .padding(20),
+        )
+        .width(Length::Fixed(300.0))
         .padding(10)
-        .align_items(Alignment::Fill)
+        .style(iced::theme::Container::Box)
         .into()
+    }
+
+    fn view(&self) -> Element<Message> {
+        let main_content: Element<Message> = container(
+            column![
+                text("Nostr Keystore").size(25),
+                iced::widget::rule::Rule::horizontal(5),
+                text("Check the warnings and set your security level below:").size(20),
+                text(&self.model.settings.security.get_security_warning_secret()).size(15),
+                pick_list(
+                    SECURITY_LEVELS,
+                    Some(self.model.settings.security.security_level),
+                    Message::SecurityLevelChange
+                )
+                .text_size(15),
+                iced::widget::rule::Rule::horizontal(5),
+                self.tab_selector(),
+                iced::widget::rule::Rule::horizontal(5),
+                text(&format!("| {}", &self.model.status.get_last_n(3))).size(15),
+                text(&format!("| {}", &self.model.status.get_last_n(2))).size(15),
+                text(&format!("| {}", &self.model.status.get_last())).size(15),
+                iced::widget::rule::Rule::horizontal(5),
+                match self.current_tab {
+                    Tab::Keys => self.tab_keys(),
+                    Tab::Delegate => self.tab_delegate(),
+                },
+                iced::widget::rule::Rule::horizontal(5),
+            ]
+            .height(Length::Fill)
+            .padding(10)
+            .align_items(Alignment::Fill),
+        )
+        .padding(10)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into();
+
+        if let Some(confirm) = &self.model.confirmation_dialog {
+            let dialog_content = self.view_dialog(confirm);
+
+            Dialog::new(main_content, dialog_content)
+                // .on_blur(Message::ConfirmationHide)
+                .into()
+        } else {
+            main_content.into()
+        }
     }
 }
 
