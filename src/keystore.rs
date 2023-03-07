@@ -275,6 +275,10 @@ impl Keystore {
         self.secret_key_input = String::new();
     }
 
+    pub fn keys_is_set(&self) -> bool {
+        self.keys.is_some()
+    }
+
     #[cfg(test)]
     pub fn is_public_key_set(&self) -> bool {
         self.get_public_key().is_ok()

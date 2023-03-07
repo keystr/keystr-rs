@@ -9,6 +9,7 @@ mod security_settings;
 mod settings;
 mod status_messages;
 mod storage;
+mod ui;
 mod ui_iced;
 
 use crate::ui_iced::KeystrApp;
