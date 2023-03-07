@@ -39,7 +39,7 @@ pub(crate) struct KeystrApp {
 impl KeystrApp {
     pub fn new() -> Self {
         Self {
-            model: KeystrModel::new(),
+            model: KeystrModel::init(),
             current_tab: Tab::Keys,
         }
     }
@@ -362,8 +362,8 @@ impl KeystrApp {
             column![
                 text("Remove exiting keys?").size(25),
                 row![
-                    button("Yes").on_press(Message::ModelAction(Action::ConfirmationOk)),
-                    button("No").on_press(Message::ModelAction(Action::ConfirmationCancel)),
+                    button("Yes").on_press(Message::ModelAction(Action::ConfirmationYes)),
+                    button("No").on_press(Message::ModelAction(Action::ConfirmationNo)),
                 ]
                 .align_items(Alignment::Fill)
                 .width(Length::Fill)
