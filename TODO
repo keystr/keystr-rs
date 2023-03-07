@@ -1,12 +1,13 @@
 - v0.5:
- - [ui] Status: for error, show popup
- - Confirmations on UI
  - desc in Readme
 - v0.6:
  - Relay support
  - Signer
 - v0.9:
  - Nostr Connect support
+
+- Key encryption pw: link entry to key entry (import, generate, etc.), and not save
+- [ui] Status: for error, show popup
 - Show QR code for keys (pub)
 - Relay support -- list, connect, query, send, etc.
 - Nostr Connect support
