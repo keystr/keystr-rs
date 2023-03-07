@@ -53,7 +53,7 @@ impl KeystrModel {
         //. Try load keys
         if model.settings.security.allows_persist() {
             model.action(Action::KeysLoad);
-}
+        }
         model
     }
 
