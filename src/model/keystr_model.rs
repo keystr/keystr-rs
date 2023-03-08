@@ -20,6 +20,8 @@ pub(crate) enum Action {
     ConfirmationNo,
     SignerConnect,
     SignerDisconnect,
+    SignerPendingIgnoreFirst,
+    SignerPendingProcessFirst,
 }
 
 #[derive(Clone)]
@@ -151,6 +153,12 @@ impl KeystrModel {
             },
             Action::SignerDisconnect => {
                 self.signer.disconnect_action(&mut self.status);
+            }
+            Action::SignerPendingIgnoreFirst => {
+                self.signer.pending_ignore_first_action(&mut self.status);
+            }
+            Action::SignerPendingProcessFirst => {
+                self.signer.pending_process_first_action(&mut self.status);
             }
         }
     }

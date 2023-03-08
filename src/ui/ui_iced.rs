@@ -364,43 +364,80 @@ impl KeystrApp {
     fn tab_signer(&self) -> Element<Message> {
         let connection = &self.model.signer.connection;
 
-        let connection_content: Element<Message> = if connection.is_none() {
-            column![
-                text("Status:  Not connected").size(15),
-                text("Enter NostrConnect URI:").size(15),
-                row![
-                    text_input(
-                        "Nostr Connect URI",
-                        &self.model.signer.connect_uri_input,
-                        Message::SignerUriInput,
-                    )
-                    .size(15),
-                    button("Paste (X)").on_press(Message::NoOp),
-                    button("QR (X)").on_press(Message::NoOp),
+        let connection_content: Element<Message> = match connection {
+            None => {
+                column![
+                    text("Status:  Not connected").size(15),
+                    text("Enter NostrConnect URI:").size(15),
+                    row![
+                        text_input(
+                            "Nostr Connect URI",
+                            &self.model.signer.connect_uri_input,
+                            Message::SignerUriInput,
+                        )
+                        .size(15),
+                        button("Paste (X)").on_press(Message::NoOp),
+                        button("QR (X)").on_press(Message::NoOp),
+                    ]
+                    .align_items(Alignment::Center)
+                    .spacing(5)
+                    .padding(0),
+                    button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
                 ]
-                .align_items(Alignment::Center)
+                // .align_items(Alignment::Fill)
                 .spacing(5)
-                .padding(0),
-                button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
-            ]
-            // .align_items(Alignment::Fill)
-            .spacing(5)
-            .padding(0)
-            .into()
-        } else {
-            column![
-                text(&format!(
-                    "Status:  Connected, through relay '{}' to client '{}'",
-                    connection.as_ref().unwrap().relay_str,
-                    connection.as_ref().unwrap().get_client_npub(),
-                ))
-                .size(15),
-                button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-            ]
-            // .align_items(Alignment::Fill)
-            .spacing(5)
-            .padding(0)
-            .into()
+                .padding(0)
+                .into()
+            }
+            Some(conn) => {
+                column![
+                    if conn.get_pending_count() == 0 {
+                        // No pending requests
+                        column![text("No pending requests").size(15)]
+                            .spacing(5)
+                            .padding(0)
+                    } else {
+                        // There are pending requests, show them
+                        let first_req_desc = conn.get_first_request_description();
+                        column![
+                            text(&format!(
+                                "There is a request ({})",
+                                conn.get_pending_count()
+                            ))
+                            .size(15),
+                            column![
+                                text(first_req_desc).size(15),
+                                row![
+                                    button("SIGN").on_press(Message::ModelAction(
+                                        Action::SignerPendingProcessFirst
+                                    )),
+                                    button("Ignore").on_press(Message::ModelAction(
+                                        Action::SignerPendingIgnoreFirst
+                                    )),
+                                ]
+                                .spacing(5)
+                                .padding(0)
+                            ]
+                            .spacing(5)
+                            .padding(0)
+                        ]
+                        .spacing(5)
+                        .padding(0)
+                    },
+                    text(&format!(
+                        "Status:  Connected, through relay '{}' to client '{}'",
+                        conn.relay_str,
+                        conn.get_client_npub(),
+                    ))
+                    .size(15),
+                    button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
+                    button("DEBUG Refresh").on_press(Message::NoOp),
+                ]
+                // .align_items(Alignment::Fill)
+                .spacing(5)
+                .padding(0)
+                .into()
+            }
         };
 
         column![text("Signer").size(25), connection_content]
