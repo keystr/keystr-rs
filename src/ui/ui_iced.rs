@@ -1,6 +1,7 @@
 use crate::model::keystr_model::{Action, Confirmation, KeystrModel};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
+
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
@@ -8,6 +9,7 @@ use iced::{Alignment, Element, Length, Sandbox};
 pub enum Tab {
     Keys,
     Delegate,
+    Signer,
 }
 
 #[derive(Debug, Clone)]
@@ -27,6 +29,7 @@ pub(crate) enum Message {
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
     SecurityLevelChange(SecurityLevel),
+    SignerUriInput(String),
     ChangedReadonly(String),
     NoOp,
 }
@@ -48,6 +51,7 @@ impl KeystrApp {
         row![
             button("Keys").on_press(Message::TabSelect(Tab::Keys)),
             button("Delegate").on_press(Message::TabSelect(Tab::Delegate)),
+            button("Signer").on_press(Message::TabSelect(Tab::Signer)),
         ]
         .padding(10)
         .spacing(5)
@@ -357,6 +361,93 @@ impl KeystrApp {
         .into()
     }
 
+    fn tab_signer(&self) -> Element<Message> {
+        let connection = &self.model.signer.connection;
+
+        let connection_content: Element<Message> = match connection {
+            None => {
+                column![
+                    text("Status:  Not connected").size(15),
+                    text("Enter NostrConnect URI:").size(15),
+                    row![
+                        text_input(
+                            "Nostr Connect URI",
+                            &self.model.signer.connect_uri_input,
+                            Message::SignerUriInput,
+                        )
+                        .size(15),
+                        button("Paste (X)").on_press(Message::NoOp),
+                        button("QR (X)").on_press(Message::NoOp),
+                    ]
+                    .align_items(Alignment::Center)
+                    .spacing(5)
+                    .padding(0),
+                    button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+                ]
+                // .align_items(Alignment::Fill)
+                .spacing(5)
+                .padding(0)
+                .into()
+            }
+            Some(conn) => {
+                column![
+                    if conn.get_pending_count() == 0 {
+                        // No pending requests
+                        column![text("No pending requests").size(15)]
+                            .spacing(5)
+                            .padding(0)
+                    } else {
+                        // There are pending requests, show them
+                        let first_req_desc = conn.get_first_request_description();
+                        column![
+                            text(&format!(
+                                "There is a request ({})",
+                                conn.get_pending_count()
+                            ))
+                            .size(15),
+                            column![
+                                text(first_req_desc).size(15),
+                                row![
+                                    button("SIGN").on_press(Message::ModelAction(
+                                        Action::SignerPendingProcessFirst
+                                    )),
+                                    button("Ignore").on_press(Message::ModelAction(
+                                        Action::SignerPendingIgnoreFirst
+                                    )),
+                                ]
+                                .spacing(5)
+                                .padding(0)
+                            ]
+                            .spacing(5)
+                            .padding(0)
+                        ]
+                        .spacing(5)
+                        .padding(0)
+                    },
+                    text(&format!(
+                        "Status:  Connected, through relay '{}' to client '{}'",
+                        conn.relay_str,
+                        conn.get_client_npub(),
+                    ))
+                    .size(15),
+                    button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
+                    button("DEBUG Refresh").on_press(Message::NoOp),
+                ]
+                // .align_items(Alignment::Fill)
+                .spacing(5)
+                .padding(0)
+                .into()
+            }
+        };
+
+        column![text("Signer").size(25), connection_content]
+            // .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(20)
+            .max_width(600)
+            .into()
+    }
+
     fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {
         container(
             column![
@@ -405,6 +496,7 @@ impl KeystrApp {
                 match self.current_tab {
                     Tab::Keys => self.tab_keys(),
                     Tab::Delegate => self.tab_delegate(),
+                    Tab::Signer => self.tab_signer(),
                 },
                 iced::widget::rule::Rule::horizontal(5),
             ]
@@ -483,6 +575,7 @@ impl Sandbox for KeystrApp {
                 self.model.delegator.time_cond_days = s;
             }
             Message::SecurityLevelChange(l) => self.model.settings.set_security_level(l),
+            Message::SignerUriInput(s) => self.model.signer.connect_uri_input = s,
             Message::ChangedReadonly(_s) => {}
             Message::NoOp => {}
         }

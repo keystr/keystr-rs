@@ -45,4 +45,19 @@ pub enum Error {
     /// JSON serialization error
     #[error(transparent)]
     JsonError(#[from] serde_json::Error),
+    /// Nostr connect error (NIP-46)
+    #[error(transparent)]
+    Nip46Error(#[from] nostr::nips::nip46::Error),
+    /// Relay client error
+    #[error(transparent)]
+    RelayClientError(#[from] nostr_sdk::client::Error),
+    /// Signer is already connected, disconnect first
+    #[error("Signer is already connected, disconnect first")]
+    SignerAlreadyConnected,
+    /// Internal threading error
+    #[error(transparent)]
+    ThreadingError(#[from] crossbeam::channel::RecvError),
+    /// Internal EventBuilder error
+    #[error(transparent)]
+    EventBuilderError(#[from] nostr::event::builder::Error),
 }

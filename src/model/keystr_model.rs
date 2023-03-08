@@ -1,6 +1,8 @@
 use crate::model::{
-    delegator::Delegator, keystore::Keystore, settings::Settings, status_messages::StatusMessages,
+    delegator::Delegator, keystore::Keystore, settings::Settings, signer::Signer,
+    status_messages::StatusMessages,
 };
+use nostr::prelude::Keys;
 
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
@@ -16,6 +18,10 @@ pub(crate) enum Action {
     KeysUnlock,
     ConfirmationYes,
     ConfirmationNo,
+    SignerConnect,
+    SignerDisconnect,
+    SignerPendingIgnoreFirst,
+    SignerPendingProcessFirst,
 }
 
 #[derive(Clone)]
@@ -24,8 +30,10 @@ pub(crate) enum Confirmation {
 }
 
 pub(crate) struct KeystrModel {
+    // app_id: Keys,
     pub own_keys: Keystore,
     pub delegator: Delegator,
+    pub signer: Signer,
     pub status: StatusMessages,
     pub settings: Settings,
     pub confirmation_dialog: Option<Confirmation>,
@@ -33,9 +41,12 @@ pub(crate) struct KeystrModel {
 
 impl KeystrModel {
     pub fn new() -> Self {
+        let app_id = Keys::generate();
         Self {
+            // app_id: app_id.clone(),
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
+            signer: Signer::new(&app_id),
             status: StatusMessages::new(),
             settings: Settings::default(),
             confirmation_dialog: None,
@@ -133,6 +144,21 @@ impl KeystrModel {
             }
             Action::ConfirmationNo => {
                 self.confirmation_dialog = None;
+            }
+            Action::SignerConnect => match self.own_keys.get_signer() {
+                Err(_) => self.status.set("Key pair is not loaded or unlocked!"),
+                Ok(signer) => {
+                    self.signer.connect_action(signer, &mut self.status);
+                }
+            },
+            Action::SignerDisconnect => {
+                self.signer.disconnect_action(&mut self.status);
+            }
+            Action::SignerPendingIgnoreFirst => {
+                self.signer.pending_ignore_first_action(&mut self.status);
+            }
+            Action::SignerPendingProcessFirst => {
+                self.signer.pending_process_first_action(&mut self.status);
             }
         }
     }

@@ -3,7 +3,9 @@ use crate::model::error::Error;
 use crate::model::security_settings::{SecurityLevel, SecuritySettings};
 use crate::model::status_messages::StatusMessages;
 use crate::model::storage::Storage;
-use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey};
+
+use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey, SECP256K1};
+use nostr::secp256k1::schnorr::Signature;
 
 use std::fs;
 
@@ -275,6 +277,12 @@ impl Keystore {
         self.secret_key_input = String::new();
     }
 
+    pub fn get_signer(&self) -> Result<KeySigner, Error> {
+        Ok(KeySigner {
+            keys: self.get_keys()?.clone(),
+        })
+    }
+
     pub fn keys_is_set(&self) -> bool {
         self.keys.is_some()
     }
@@ -300,7 +308,7 @@ impl Keystore {
         }
     }
 
-    fn get_public_key(&self) -> Result<XOnlyPublicKey, Error> {
+    pub fn get_public_key(&self) -> Result<XOnlyPublicKey, Error> {
         Ok(self.get_keys()?.public_key())
     }
 
@@ -335,6 +343,24 @@ impl Keystore {
                 }
             }
         }
+    }
+}
+
+/// Can sign a hash with its own secret key
+#[derive(Clone)]
+pub(crate) struct KeySigner {
+    keys: Keys,
+}
+
+impl KeySigner {
+    pub fn get_public_key(&self) -> XOnlyPublicKey {
+        self.keys.public_key()
+    }
+
+    /// Perform signing of a hash using loaded secret key
+    pub fn sign(&self, hash: Vec<u8>) -> Result<Signature, Error> {
+        let kp = self.keys.key_pair()?;
+        Ok(SECP256K1.sign_schnorr(&nostr::secp256k1::Message::from_slice(&hash)?, &kp))
     }
 }
 

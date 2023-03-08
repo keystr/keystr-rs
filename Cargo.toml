@@ -15,15 +15,18 @@ keywords = ["nostr", "nip-26",]
 
 [dependencies]
 chacha20poly1305 = "0.10.1"
+crossbeam = "0.8.2"
 dirs = "4.0.0"
 hex = "0.4.3"
 iced = "0.8.0"
 iced_native = "0.9.1"
 nostr = "0.19.0"
+nostr-sdk = "0.19.0"
 rand_core = "0.6"
 readonly = "0.2.3"
 scrypt = "0.10.0"
 serde = "1.0.152"
 serde_json = "1.0.93"
 thiserror = "1.0"
+tokio = "1.26.0"
 zeroize = "1.5"
