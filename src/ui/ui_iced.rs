@@ -1,6 +1,7 @@
 use crate::model::keystr_model::{Action, Confirmation, KeystrModel};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
+
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
@@ -361,28 +362,53 @@ impl KeystrApp {
     }
 
     fn tab_signer(&self) -> Element<Message> {
-        column![
-            text("Signer").size(25),
-            text("Enter NConnect URI:").size(15),
-            row![
-                text_input(
-                    "Nostr Connect URI",
-                    &self.model.signer.connect_uri_input,
-                    Message::SignerUriInput,
-                )
-                .size(15),
+        let connection = &self.model.signer.connection;
+
+        let connection_content: Element<Message> = if connection.is_none() {
+            column![
+                text("Status:  Not connected").size(15),
+                text("Enter NostrConnect URI:").size(15),
+                row![
+                    text_input(
+                        "Nostr Connect URI",
+                        &self.model.signer.connect_uri_input,
+                        Message::SignerUriInput,
+                    )
+                    .size(15),
+                    button("Paste (X)").on_press(Message::NoOp),
+                    button("QR (X)").on_press(Message::NoOp),
+                ]
+                .align_items(Alignment::Center)
+                .spacing(5)
+                .padding(0),
                 button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
             ]
-            .align_items(Alignment::Center)
+            // .align_items(Alignment::Fill)
             .spacing(5)
-            .padding(0),
-            button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-        ]
-        // .align_items(Alignment::Fill)
-        .spacing(5)
-        .padding(20)
-        .max_width(600)
-        .into()
+            .padding(0)
+            .into()
+        } else {
+            column![
+                text(&format!(
+                    "Status:  Connected, through relay '{}' to client '{}'",
+                    connection.as_ref().unwrap().relay_str,
+                    connection.as_ref().unwrap().get_client_npub(),
+                ))
+                .size(15),
+                button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
+            ]
+            // .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0)
+            .into()
+        };
+
+        column![text("Signer").size(25), connection_content]
+            // .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(20)
+            .max_width(600)
+            .into()
     }
 
     fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {

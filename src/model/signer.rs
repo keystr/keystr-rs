@@ -12,14 +12,16 @@ use std::time::Duration;
 use tokio::runtime::Handle;
 
 /// Model for Signer
+#[readonly::make]
 pub(crate) struct Signer {
     app_id_keys: Keys,
+    #[readonly]
     connection: Option<SignerConnection>,
     pub connect_uri_input: String,
 }
 
 /// Represents an active Nostr Connect connection
-struct SignerConnection {
+pub(crate) struct SignerConnection {
     // uri: NostrConnectURI,
     pub client_pubkey: XOnlyPublicKey,
     pub relay_str: String,
@@ -88,6 +90,12 @@ impl Signer {
         } else {
             "-".to_string()
         }
+    }
+}
+
+impl SignerConnection {
+    pub fn get_client_npub(&self) -> String {
+        self.client_pubkey.to_bech32().unwrap_or_default()
     }
 }
 
