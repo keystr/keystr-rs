@@ -4,9 +4,8 @@ use crate::model::security_settings::{SecurityLevel, SecuritySettings};
 use crate::model::status_messages::StatusMessages;
 use crate::model::storage::Storage;
 
-use nostr::prelude::{
-    schnorr::Signature, FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey, SECP256K1,
-};
+use nostr::prelude::{FromPkStr, FromSkStr, Keys, SecretKey, ToBech32, XOnlyPublicKey, SECP256K1};
+use nostr::secp256k1::schnorr::Signature;
 
 use std::fs;
 
