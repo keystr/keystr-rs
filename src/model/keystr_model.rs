@@ -143,9 +143,12 @@ impl KeystrModel {
             Action::ConfirmationNo => {
                 self.confirmation_dialog = None;
             }
-            Action::SignerConnect => {
-                self.signer.connect_action(&mut self.status);
-            }
+            Action::SignerConnect => match self.own_keys.get_signer() {
+                Err(_) => self.status.set("Key pair is not loaded or unlocked!"),
+                Ok(signer) => {
+                    self.signer.connect_action(signer, &mut self.status);
+                }
+            },
             Action::SignerDisconnect => {
                 self.signer.disconnect_action(&mut self.status);
             }
