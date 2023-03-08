@@ -376,8 +376,9 @@ impl KeystrApp {
             .align_items(Alignment::Center)
             .spacing(5)
             .padding(0),
+            button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
         ]
-        .align_items(Alignment::Fill)
+        // .align_items(Alignment::Fill)
         .spacing(5)
         .padding(20)
         .max_width(600)

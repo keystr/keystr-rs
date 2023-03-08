@@ -1,14 +1,11 @@
 use crate::model::error::Error;
 use crate::model::status_messages::StatusMessages;
-use crate::ui::ui_iced::KeystrApp;
 use crossbeam::channel;
 use nostr::nips::nip46::{Message, Request};
-use nostr::prelude::{EventBuilder, Keys, NostrConnectURI, XOnlyPublicKey};
+use nostr::prelude::{EventBuilder, Keys, NostrConnectURI, ToBech32, XOnlyPublicKey};
 use nostr_sdk::client::{Client, Options};
 use std::str::FromStr;
-use tokio::io::AsyncReadExt;
 use tokio::runtime::Handle;
-use tokio::task;
 
 /// Model for Signer
 pub(crate) struct Signer {
@@ -20,9 +17,9 @@ pub(crate) struct Signer {
 /// Represents an active Nostr Connect connection
 struct SignerConnection {
     uri: NostrConnectURI,
-    relay_str: String,
-    // relay_client: Client,
-    app_pubkey: XOnlyPublicKey,
+    pub client_pubkey: XOnlyPublicKey,
+    pub relay_str: String,
+    relay_client: Client,
 }
 
 impl Signer {
@@ -35,59 +32,57 @@ impl Signer {
         }
     }
 
-    pub fn connect(&mut self, uri_str: &str) -> Result<(), Error> {
+    fn connect(&mut self, uri_str: &str) -> Result<(), Error> {
         if self.connection.is_some() {
             return Err(Error::SignerAlreadyConnected);
         }
-        let uri = &NostrConnectURI::from_str(uri_str)?;
-        let app_pubkey = uri.public_key.clone();
-        let relay = &uri.relay_url;
-        println!("Relay {relay}");
-
-        // let opts = Options::new().wait_for_send(true);
-        // let relay_client = Client::new_with_opts(&self.app_id_keys, opts);
-        // relay_client.add_relay(relay.to_string(), None).await?;
-        // relay_client.connect().await;
-
-        self.connection = Some(SignerConnection {
-            uri: uri.clone(),
-            relay_str: relay.to_string(),
-            // relay_client,
-            app_pubkey,
-        });
+        let handle = tokio::runtime::Handle::current();
+        let conn = relay_connect_blocking(uri_str, &self.app_id_keys, handle)?;
+        self.connection = Some(conn);
         Ok(())
     }
 
-    /*
-    pub fn connect_block(&mut self, uri_str: &str, handle: Handle) -> Result<(), Error> {
-        let (tx, rx) = channel::bounded(1);
-        handle.spawn(async move {
-            let conn_res = self.connect(uri_str).await;
-            let _ = tx.send(conn_res);
-        });
-        Ok(rx.recv()??)
+    fn disconnect(&mut self) -> Result<(), Error> {
+        if let Some(conn) = &self.connection {
+            let handle = tokio::runtime::Handle::current();
+            let _res = relay_disconnect_blocking(conn.relay_client.clone(), handle)?;
+        }
+        self.connection = None;
+        Ok(())
     }
-    */
 
-    pub fn connect_action(&mut self, signer_keys: &Keys, status: &mut StatusMessages) {
+    pub fn connect_action(&mut self, status: &mut StatusMessages) {
         let uri_input = self.connect_uri_input.clone();
-        let handle = tokio::runtime::Handle::current();
-        let res = self.connect(&uri_input);
-        let res = connect_block(uri_input, &self.app_id_keys, signer_keys, handle);
-        //, handle);
-        match res {
-            Err(e) => status.set_error_err(&e),
+        match self.connect(&uri_input) {
+            Err(e) => status.set_error(&format!("Could not connect to relay: {}", e.to_string())),
             Ok(_) => status.set(&format!(
-                "Signer connected, relay {}",
-                &self.get_relay_str()
+                "Signer connected (relay: {}, client npub: {})",
+                &self.get_relay_str(),
+                &self.get_client_npub(),
             )),
         }
     }
 
+    pub fn disconnect_action(&mut self, status: &mut StatusMessages) {
+        if let Some(conn) = &self.connection {
+            let res_ignore = self.disconnect();
+            status.set("Signer disconnected");
+        }
+        self.connection = None;
+    }
+
     fn get_relay_str(&self) -> String {
         match &self.connection {
-            None => "-".to_string(),
             Some(conn) => conn.relay_str.clone(),
+            None => "-".to_string(),
+        }
+    }
+
+    fn get_client_npub(&self) -> String {
+        if let Some(conn) = &self.connection {
+            conn.client_pubkey.to_bech32().unwrap_or_default()
+        } else {
+            "-".to_string()
         }
     }
 }
@@ -101,41 +96,63 @@ async fn send_message(
     let event =
         EventBuilder::nostr_connect(&keys, *receiver_pubkey, msg.clone())?.to_event(&keys)?;
     relay_client.send_event(event).await?;
-    println!("Message sent, {:?}", msg);
+    println!("DEBUG: Message sent, {:?}", msg);
     Ok(())
 }
 
-async fn connect_async(uri_str: &str, app_id_keys: &Keys, signer_keys: &Keys) -> Result<(), Error> {
+async fn relay_connect(uri_str: &str, connect_id_keys: &Keys) -> Result<SignerConnection, Error> {
     let uri = &NostrConnectURI::from_str(uri_str)?;
-    let app_pubkey = uri.public_key.clone();
+    let connect_client_id_pubkey = uri.public_key.clone();
     let relay = &uri.relay_url;
-    println!("Relay {relay}");
 
     let opts = Options::new().wait_for_send(true);
-    let relay_client = Client::new_with_opts(&app_id_keys, opts);
+    let relay_client = Client::new_with_opts(&connect_id_keys, opts);
     relay_client.add_relay(relay.to_string(), None).await?;
+    // TODO: SDK does not give an error here
     relay_client.connect().await;
 
     // Send connect ACK
-    let msg = Message::request(Request::Connect(signer_keys.public_key()));
-    let _ = send_message(&relay_client, &msg, &app_pubkey).await?;
+    let msg = Message::request(Request::Connect(connect_id_keys.public_key()));
+    let _ = send_message(&relay_client, &msg, &connect_client_id_pubkey).await?;
 
+    Ok(SignerConnection {
+        uri: uri.clone(),
+        relay_str: relay.to_string(),
+        relay_client,
+        client_pubkey: connect_client_id_pubkey,
+    })
+}
+
+async fn relay_disconnect(relay_client: Client) -> Result<(), Error> {
+    let _res = relay_client.disconnect().await?;
     Ok(())
 }
 
-fn connect_block(
-    uri_str: String,
-    app_id_keys: &Keys,
-    signer_keys: &Keys,
+fn relay_connect_blocking(
+    uri_str: &str,
+    connect_id_keys: &Keys,
+    handle: Handle,
+) -> Result<SignerConnection, Error> {
+    let (tx, rx) = channel::bounded(1);
+    let uri_str_clone = uri_str.to_owned();
+    let connect_id_keys_clone = connect_id_keys.clone();
+    handle.spawn(async move {
+        let conn_res = relay_connect(&uri_str_clone, &connect_id_keys_clone).await;
+        let _ = tx.send(conn_res);
+    });
+    let conn = rx.recv()?;
+    conn
+}
+
+fn relay_disconnect_blocking(
+    relay_client: Client,
     handle: Handle,
 ) -> Result<(), Error> {
     let (tx, rx) = channel::bounded(1);
-    let uri_str_clone = uri_str.clone();
-    let app_id_keys_clone = app_id_keys.clone();
-    let signer_keys_clone = signer_keys.clone();
+    let relay_client_clone = relay_client.clone();
     handle.spawn(async move {
-        let conn_res = connect_async(&uri_str_clone, &app_id_keys_clone, &signer_keys_clone).await;
-        let _ = tx.send(conn_res);
+        let disconn_res = relay_disconnect(relay_client_clone).await;
+        let _ = tx.send(disconn_res);
     });
-    Ok(rx.recv()??)
+    rx.recv()?
 }

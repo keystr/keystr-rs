@@ -305,7 +305,7 @@ impl Keystore {
     }
 
     /// Warning: Security-sensitive method!
-    pub fn get_secret_key(&self) -> Result<SecretKey, Error> {
+    fn get_secret_key(&self) -> Result<SecretKey, Error> {
         Ok(self.get_keys()?.secret_key()?)
     }
 

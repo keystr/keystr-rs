@@ -19,6 +19,7 @@ pub(crate) enum Action {
     ConfirmationYes,
     ConfirmationNo,
     SignerConnect,
+    SignerDisconnect,
 }
 
 #[derive(Clone)]
@@ -143,8 +144,10 @@ impl KeystrModel {
                 self.confirmation_dialog = None;
             }
             Action::SignerConnect => {
-                let sk = self.own_keys.get_keys().unwrap();
-                let _ = self.signer.connect_action(&sk, &mut self.status);
+                self.signer.connect_action(&mut self.status);
+            }
+            Action::SignerDisconnect => {
+                self.signer.disconnect_action(&mut self.status);
             }
         }
     }
