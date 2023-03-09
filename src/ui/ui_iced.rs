@@ -1,4 +1,4 @@
-use crate::model::keystr_model::{Action, Confirmation, KeystrModel};
+use crate::model::keystr_model::{Action, Confirmation, KeystrModel, Modal};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
 
@@ -448,9 +448,9 @@ impl KeystrApp {
             .into()
     }
 
-    fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {
-        container(
-            column![
+    fn view_dialog(&self, modal: &Modal) -> Element<Message> {
+        container(match modal {
+            Modal::Confirmation(Confirmation::KeysClearBeforeAction(_)) => column![
                 text("Remove existing keys?").size(25),
                 row![
                     button("Yes").on_press(Message::ModelAction(Action::ConfirmationYes)),
@@ -466,7 +466,12 @@ impl KeystrApp {
             .width(Length::Fill)
             .spacing(5)
             .padding(20),
-        )
+            // _ => column![text("?").size(25)]
+            //     .align_items(Alignment::Fill)
+            //     .width(Length::Fill)
+            //     .spacing(5)
+            //     .padding(20),
+        })
         .width(Length::Fixed(300.0))
         .padding(10)
         .style(iced::theme::Container::Box)
@@ -509,11 +514,11 @@ impl KeystrApp {
         .height(Length::Fill)
         .into();
 
-        if let Some(confirm) = &self.model.confirmation_dialog {
-            let dialog_content = self.view_dialog(confirm);
+        if let Some(modal) = &self.model.modal {
+            let dialog_content = self.view_dialog(modal);
 
             Dialog::new(main_content, dialog_content)
-                // .on_blur(Message::ConfirmationHide)
+                // .on_blur(Message::ModalHide) // non-modal
                 .into()
         } else {
             main_content.into()
