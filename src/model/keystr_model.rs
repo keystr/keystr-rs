@@ -66,11 +66,11 @@ pub trait EventSink {
 // Wrapper for event sink
 #[derive(Clone)]
 pub(crate) struct EventSinkWrapper {
-    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+    event_sink: Option<Arc<Mutex<Box<dyn EventSink + Send>>>>,
 }
 
 impl KeystrModel {
-    pub fn new(event_sink: Box<dyn EventSink + Send>) -> Self {
+    pub fn new(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
         let app_id = Keys::generate();
         let event_sink_wrapper = EventSinkWrapper::new(event_sink);
         Self {
@@ -85,7 +85,7 @@ impl KeystrModel {
     }
 
     // Create and init model
-    pub fn init(event_sink: Box<dyn EventSink + Send>) -> Self {
+    pub fn init(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
         let mut model = Self::new(event_sink);
 
         model.status.set("Keystr starting");
@@ -169,11 +169,15 @@ impl KeystrModel {
                 .unlock_secret_key_action(&self.settings.security, &mut self.status),
             Action::ConfirmationYes => {
                 if let Some(Modal::Confirmation(conf)) = &self.modal {
-                    if let Confirmation::KeysClearBeforeAction(Some(next_action)) = conf {
-                        let prev_next_action = next_action.clone();
-                        self.modal = None;
-                        self.action(Action::KeysClearNoConfirm);
-                        self.action(prev_next_action);
+                    match conf {
+                        Confirmation::KeysClearBeforeAction(opt_next_action) => {
+                            let prev_next_action = opt_next_action.clone();
+                            self.modal = None;
+                            self.action(Action::KeysClearNoConfirm);
+                            if let Some(next_action) = prev_next_action {
+                                self.action(next_action);
+                            }
+                        }
                     }
                 }
             }
@@ -202,14 +206,19 @@ impl KeystrModel {
 }
 
 impl EventSinkWrapper {
-    fn new(event_sink: Box<dyn EventSink + Send>) -> Self {
+    fn new(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
         EventSinkWrapper {
-            event_sink: Arc::new(Mutex::new(event_sink)),
+            event_sink: match event_sink {
+                None => None,
+                Some(es) => Some(Arc::new(Mutex::new(es))),
+            },
         }
     }
 
     pub fn handle_event(&self, event: &Event) {
-        self.event_sink.lock().unwrap().handle_event(event);
+        if let Some(es) = &self.event_sink {
+            es.lock().unwrap().handle_event(event);
+        }
     }
 }
 
@@ -219,7 +228,7 @@ mod test {
 
     #[test]
     fn test_clear_generate_confirmation() {
-        let mut m = KeystrModel::new();
+        let mut m = KeystrModel::new(None);
         assert_eq!(m.own_keys.keys_is_set(), false);
         assert!(m.modal.is_none());
 

@@ -52,7 +52,7 @@ struct AppEventSink {}
 impl KeystrApp {
     pub fn new() -> Self {
         Self {
-            model: KeystrModel::init(Box::new(AppEventSink {})),
+            model: KeystrModel::init(Some(Box::new(AppEventSink {}))),
             current_tab: Tab::Keys,
         }
     }
