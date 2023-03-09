@@ -1,6 +1,6 @@
 use crate::base::error::Error;
 use crate::model::keystore::KeySigner;
-use crate::model::keystr_model::{Event, EventSink};
+use crate::model::keystr_model::{Event, EventSinkWrapper};
 use crate::model::status_messages::StatusMessages;
 
 use nostr::nips::nip46::{Message, Request};
@@ -20,7 +20,7 @@ pub(crate) struct Signer {
     #[readonly]
     connection: Option<Arc<SignerConnection>>,
     pub connect_uri_input: String,
-    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+    event_sink: EventSinkWrapper,
 }
 
 /// Represents an active Nostr Connect connection
@@ -32,7 +32,7 @@ pub(crate) struct SignerConnection {
     pub relay_str: String,
     relay_client: Client,
     key_signer: KeySigner,
-    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+    event_sink: EventSinkWrapper,
     /// Holds pending requests (mostly Sign requests), and can handle them
     requests: Mutex<Vec<SignatureReqest>>,
 }
@@ -44,7 +44,7 @@ pub(crate) struct SignatureReqest {
 }
 
 impl Signer {
-    pub fn new(app_id: &Keys, event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>) -> Self {
+    pub fn new(app_id: &Keys, event_sink: EventSinkWrapper) -> Self {
         Signer {
             app_id_keys: app_id.clone(),
             connection: None,
@@ -57,7 +57,7 @@ impl Signer {
         &mut self,
         uri_str: &str,
         key_signer: &KeySigner,
-        event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+        event_sink: EventSinkWrapper,
     ) -> Result<(), Error> {
         if self.connection.is_some() {
             return Err(Error::SignerAlreadyConnected);
@@ -86,10 +86,7 @@ impl Signer {
         let _ = relay_connect_blocking(connection.clone(), handle)?;
         // Connected
         self.connection = Some(connection);
-        event_sink
-            .lock()
-            .unwrap()
-            .handle_event(&Event::SignerConnected);
+        event_sink.handle_event(&Event::SignerConnected);
         Ok(())
     }
 
@@ -401,13 +398,9 @@ async fn handle_request_message(
                     let _ = send_message(relay_client, &response_msg, sender_pubkey).await?;
                 }
                 Request::SignEvent(_) => {
-                    // This request needs user processing, store it
+                    // This request needs user processing, store it, notify it
                     connection.add_request(msg.clone(), sender_pubkey.clone());
-                    connection
-                        .event_sink
-                        .lock()
-                        .unwrap()
-                        .handle_event(&Event::SignerNewRequest);
+                    connection.event_sink.handle_event(&Event::SignerNewRequest);
                 }
                 _ => {
                     println!("DEBUG: Unhandled Request {:?}", msg.to_request());

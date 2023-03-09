@@ -53,7 +53,7 @@ pub(crate) struct KeystrModel {
     pub signer: Signer,
     pub status: StatusMessages,
     pub settings: Settings,
-    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+    event_sink: EventSinkWrapper,
     #[readonly]
     modal: Option<Modal>,
 }
@@ -63,17 +63,23 @@ pub trait EventSink {
     fn handle_event(&mut self, event: &Event);
 }
 
+// Wrapper for event sink
+#[derive(Clone)]
+pub(crate) struct EventSinkWrapper {
+    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+}
+
 impl KeystrModel {
     pub fn new(event_sink: Box<dyn EventSink + Send>) -> Self {
         let app_id = Keys::generate();
-        let event_sink_arc = Arc::new(Mutex::new(event_sink));
+        let event_sink_wrapper = EventSinkWrapper::new(event_sink);
         Self {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
-            signer: Signer::new(&app_id, event_sink_arc.clone()),
+            signer: Signer::new(&app_id, event_sink_wrapper.clone()),
             status: StatusMessages::new(),
             settings: Settings::default(),
-            event_sink: event_sink_arc.clone(),
+            event_sink: event_sink_wrapper,
             modal: None,
         }
     }
@@ -192,6 +198,18 @@ impl KeystrModel {
                 self.signer.pending_process_first_action(&mut self.status);
             }
         }
+    }
+}
+
+impl EventSinkWrapper {
+    fn new(event_sink: Box<dyn EventSink + Send>) -> Self {
+        EventSinkWrapper {
+            event_sink: Arc::new(Mutex::new(event_sink)),
+        }
+    }
+
+    pub fn handle_event(&self, event: &Event) {
+        self.event_sink.lock().unwrap().handle_event(event);
     }
 }
 
