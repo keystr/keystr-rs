@@ -1,4 +1,4 @@
-use crate::model::error::Error;
+use crate::base::error::Error;
 use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit, Payload},
     XChaCha20Poly1305,

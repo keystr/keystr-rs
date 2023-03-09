@@ -1,4 +1,4 @@
-use crate::model::error::Error;
+use crate::base::error::Error;
 use crate::model::keystore::KeySigner;
 use crate::model::status_messages::StatusMessages;
 

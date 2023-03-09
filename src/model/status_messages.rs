@@ -1,4 +1,4 @@
-use crate::model::error::Error;
+use crate::base::error::Error;
 
 const STATUS_MAX_LINES: usize = 10;
 
