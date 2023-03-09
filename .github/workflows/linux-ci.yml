@@ -23,10 +23,11 @@ jobs:
     - name: Set default toolchain
       run: |
         rustup default 1.67.0
+        rustup component add rustfmt
         rustc --version
     - name: Build
       run: cargo build
     - name: Run tests
       run: cargo test
-    - name: Check format
+    - name: Check formatting
       run: cargo fmt --check
