@@ -1,5 +1,6 @@
 use crate::base::error::Error;
 use crate::model::keystore::KeySigner;
+use crate::model::keystr_model::{Event, EventSink};
 use crate::model::status_messages::StatusMessages;
 
 use nostr::nips::nip46::{Message, Request};
@@ -19,15 +20,19 @@ pub(crate) struct Signer {
     #[readonly]
     connection: Option<Arc<SignerConnection>>,
     pub connect_uri_input: String,
+    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
 }
 
 /// Represents an active Nostr Connect connection
 pub(crate) struct SignerConnection {
     // uri: NostrConnectURI,
     pub client_pubkey: XOnlyPublicKey,
+    // My client app ID, for the relays (not the one for signing)
+    pub app_id_keys: Keys,
     pub relay_str: String,
     relay_client: Client,
     key_signer: KeySigner,
+    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
     /// Holds pending requests (mostly Sign requests), and can handle them
     requests: Mutex<Vec<SignatureReqest>>,
 }
@@ -39,21 +44,52 @@ pub(crate) struct SignatureReqest {
 }
 
 impl Signer {
-    pub fn new(app_id: &Keys) -> Self {
+    pub fn new(app_id: &Keys, event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>) -> Self {
         Signer {
             app_id_keys: app_id.clone(),
             connection: None,
             connect_uri_input: String::new(),
+            event_sink,
         }
     }
 
-    fn connect(&mut self, uri_str: &str, key_signer: &KeySigner) -> Result<(), Error> {
+    fn connect(
+        &mut self,
+        uri_str: &str,
+        key_signer: &KeySigner,
+        event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
+    ) -> Result<(), Error> {
         if self.connection.is_some() {
             return Err(Error::SignerAlreadyConnected);
         }
+
+        let uri = &NostrConnectURI::from_str(uri_str)?;
+        let connect_client_id_pubkey = uri.public_key.clone();
+        let relay = &uri.relay_url;
+
+        // Create relay client, but don't connect it yet
+        let opts = Options::new().wait_for_send(true);
+        let relay_client = Client::new_with_opts(&self.app_id_keys, opts);
+
+        let connection = Arc::new(SignerConnection {
+            // uri: uri.clone(),
+            relay_str: relay.to_string(),
+            relay_client,
+            client_pubkey: connect_client_id_pubkey,
+            app_id_keys: self.app_id_keys.clone(),
+            key_signer: key_signer.clone(),
+            event_sink: event_sink.clone(),
+            requests: Mutex::new(Vec::new()),
+        });
+
         let handle = tokio::runtime::Handle::current();
-        let conn = relay_connect_blocking(uri_str, &self.app_id_keys, key_signer, handle)?;
-        self.connection = Some(conn);
+        let _ = relay_connect_blocking(connection.clone(), handle)?;
+        // Connected
+        self.connection = Some(connection);
+        event_sink
+            .lock()
+            .unwrap()
+            .handle_event(&Event::SignerConnected);
         Ok(())
     }
 
@@ -68,7 +104,7 @@ impl Signer {
 
     pub fn connect_action(&mut self, key_signer: KeySigner, status: &mut StatusMessages) {
         let uri_input = self.connect_uri_input.clone();
-        match self.connect(&uri_input, &key_signer) {
+        match self.connect(&uri_input, &key_signer, self.event_sink.clone()) {
             Err(e) => status.set_error(&format!("Could not connect to relay: {}", e.to_string())),
             Ok(_) => status.set(&format!(
                 "Signer connected (relay: {}, client npub: {})",
@@ -238,36 +274,23 @@ fn send_message_blocking(
 }
 
 async fn relay_connect(
-    uri_str: &str,
+    connection: Arc<SignerConnection>,
     connect_id_keys: &Keys,
-    key_signer: KeySigner,
-) -> Result<Arc<SignerConnection>, Error> {
-    let uri = &NostrConnectURI::from_str(uri_str)?;
-    let connect_client_id_pubkey = uri.public_key.clone();
-    let relay = &uri.relay_url;
-
-    let opts = Options::new().wait_for_send(true);
-    let relay_client = Client::new_with_opts(&connect_id_keys, opts);
-    relay_client.add_relay(relay.to_string(), None).await?;
+) -> Result<(), Error> {
+    connection
+        .relay_client
+        .add_relay(&connection.relay_str, None)
+        .await?;
     // TODO: SDK does not give an error here
-    relay_client.connect().await;
-
-    let connection = Arc::new(SignerConnection {
-        // uri: uri.clone(),
-        relay_str: relay.to_string(),
-        relay_client,
-        client_pubkey: connect_client_id_pubkey,
-        key_signer: key_signer.clone(),
-        requests: Mutex::new(Vec::new()),
-    });
+    connection.relay_client.connect().await;
 
     let _res = start_handler_loop(connection.clone(), tokio::runtime::Handle::current())?;
 
     // Send connect ACK
     let msg = Message::request(Request::Connect(connect_id_keys.public_key()));
-    let _ = send_message(&connection.relay_client, &msg, &connect_client_id_pubkey).await?;
+    let _ = send_message(&connection.relay_client, &msg, &connection.client_pubkey).await?;
 
-    Ok(connection)
+    Ok(())
 }
 
 async fn relay_disconnect(relay_client: Client) -> Result<(), Error> {
@@ -275,23 +298,16 @@ async fn relay_disconnect(relay_client: Client) -> Result<(), Error> {
     Ok(())
 }
 
-fn relay_connect_blocking(
-    uri_str: &str,
-    connect_id_keys: &Keys,
-    key_signer: &KeySigner,
-    handle: Handle,
-) -> Result<Arc<SignerConnection>, Error> {
+fn relay_connect_blocking(connection: Arc<SignerConnection>, handle: Handle) -> Result<(), Error> {
     let (tx, rx) = channel::bounded(1);
-    let uri_str_clone = uri_str.to_owned();
-    let connect_id_keys_clone = connect_id_keys.clone();
-    let key_signer_clone = key_signer.clone();
+    let connect_id_keys_clone = connection.app_id_keys.clone();
+    let connection_clone = connection.clone();
     handle.spawn(async move {
-        let conn_res =
-            relay_connect(&uri_str_clone, &connect_id_keys_clone, key_signer_clone).await;
+        let conn_res = relay_connect(connection_clone, &connect_id_keys_clone).await;
         let _ = tx.send(conn_res);
     });
-    let conn = rx.recv()?;
-    conn
+    let _ = rx.recv()?;
+    Ok(())
 }
 
 fn relay_disconnect_blocking(relay_client: Client, handle: Handle) -> Result<(), Error> {
@@ -387,6 +403,11 @@ async fn handle_request_message(
                 Request::SignEvent(_) => {
                     // This request needs user processing, store it
                     connection.add_request(msg.clone(), sender_pubkey.clone());
+                    connection
+                        .event_sink
+                        .lock()
+                        .unwrap()
+                        .handle_event(&Event::SignerNewRequest);
                 }
                 _ => {
                     println!("DEBUG: Unhandled Request {:?}", msg.to_request());

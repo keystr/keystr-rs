@@ -4,6 +4,8 @@ use crate::model::{
 };
 use nostr::prelude::Keys;
 
+use std::sync::{Arc, Mutex};
+
 /// Actions that can be triggerred from the UI
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
@@ -30,7 +32,7 @@ pub(crate) enum Action {
 pub enum Event {
     SignerConnected,
     SignerNewRequest,
-    StatusUpdate,
+    // StatusUpdate,
 }
 
 /// Modal dialogs
@@ -51,7 +53,7 @@ pub(crate) struct KeystrModel {
     pub signer: Signer,
     pub status: StatusMessages,
     pub settings: Settings,
-    // event_sink:
+    event_sink: Arc<Mutex<Box<dyn EventSink + Send>>>,
     #[readonly]
     modal: Option<Modal>,
 }
@@ -62,23 +64,24 @@ pub trait EventSink {
 }
 
 impl KeystrModel {
-    pub fn new() -> Self {
+    pub fn new(event_sink: Box<dyn EventSink + Send>) -> Self {
         let app_id = Keys::generate();
+        let event_sink_arc = Arc::new(Mutex::new(event_sink));
         Self {
-            // app_id: app_id.clone(),
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
-            signer: Signer::new(&app_id),
+            signer: Signer::new(&app_id, event_sink_arc.clone()),
             status: StatusMessages::new(),
             settings: Settings::default(),
-            // event_sink: event_sink_arc.clone(),
+            event_sink: event_sink_arc.clone(),
             modal: None,
         }
     }
 
     // Create and init model
-    pub fn init() -> Self {
-        let mut model = Self::new();
+    pub fn init(event_sink: Box<dyn EventSink + Send>) -> Self {
+        let mut model = Self::new(event_sink);
+
         model.status.set("Keystr starting");
         //. Try load settings
         if let Ok(sett) = Settings::load() {

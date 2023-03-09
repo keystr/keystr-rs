@@ -52,7 +52,7 @@ struct AppEventSink {}
 impl KeystrApp {
     pub fn new() -> Self {
         Self {
-            model: KeystrModel::init(),
+            model: KeystrModel::init(Box::new(AppEventSink {})),
             current_tab: Tab::Keys,
         }
     }
@@ -623,10 +623,9 @@ impl EventSink for AppEventSink {
             }
             Event::SignerNewRequest => {
                 println!("Event: New Signer request");
-            }
-            Event::StatusUpdate => {
-                println!("Event: Status update");
-            }
+            } // Event::StatusUpdate => {
+              //     println!("Event: Status update");
+              // }
         }
     }
 }
