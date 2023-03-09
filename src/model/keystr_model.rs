@@ -4,6 +4,7 @@ use crate::model::{
 };
 use nostr::prelude::Keys;
 
+/// Actions that can be triggerred from the UI
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
     DelegateDeeGenerate,
@@ -24,6 +25,14 @@ pub(crate) enum Action {
     SignerPendingProcessFirst,
 }
 
+/// Events that can affect the UI
+/// #[derive(Clone, Debug)]
+pub enum Event {
+    SignerConnected,
+    SignerNewRequest,
+    StatusUpdate,
+}
+
 /// Modal dialogs
 #[derive(Clone)]
 pub(crate) enum Modal {
@@ -37,14 +46,19 @@ pub(crate) enum Confirmation {
 
 #[readonly::make]
 pub(crate) struct KeystrModel {
-    // app_id: Keys,
     pub own_keys: Keystore,
     pub delegator: Delegator,
     pub signer: Signer,
     pub status: StatusMessages,
     pub settings: Settings,
+    // event_sink:
     #[readonly]
     modal: Option<Modal>,
+}
+
+/// Trait for someone who can consume our Events
+pub trait EventSink {
+    fn handle_event(&mut self, event: &Event);
 }
 
 impl KeystrModel {
@@ -57,6 +71,7 @@ impl KeystrModel {
             signer: Signer::new(&app_id),
             status: StatusMessages::new(),
             settings: Settings::default(),
+            // event_sink: event_sink_arc.clone(),
             modal: None,
         }
     }
@@ -64,7 +79,7 @@ impl KeystrModel {
     // Create and init model
     pub fn init() -> Self {
         let mut model = Self::new();
-        model.status.set("Keystr started");
+        model.status.set("Keystr starting");
         //. Try load settings
         if let Ok(sett) = Settings::load() {
             model.settings = sett;

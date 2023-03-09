@@ -1,9 +1,13 @@
-use crate::model::keystr_model::{Action, Confirmation, KeystrModel, Modal};
+use crate::model::keystr_model::{Action, Confirmation, Event, EventSink, KeystrModel, Modal};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
 
+use iced::executor;
+use iced::time;
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
-use iced::{Alignment, Element, Length, Sandbox};
+use iced::{Alignment, Application, Command, Element, Length, Subscription, Theme};
+
+use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -14,30 +18,36 @@ pub enum Tab {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
-    TabSelect(Tab),
+    ChangedReadonly(String),
     ModelAction(Action),
+    NoOp,
+    Refresh,
+    SecurityLevelChange(SecurityLevel),
+    TabSelect(Tab),
+
     KeysPubkeyInput(String),
     KeysToggleHideSecretKey,
     KeysSecretkeyInput(String),
     KeysDecryptPasswordInput(String),
     KeysSavePasswordInput(String),
     KeysSaveRepeatPasswordInput(String),
+
     DelegateDeeChanged(String),
     DelegateKindChanged(String),
     DelegateTimeStartChanged(String),
     DelegateTimeEndChanged(String),
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
-    SecurityLevelChange(SecurityLevel),
+
     SignerUriInput(String),
-    ChangedReadonly(String),
-    NoOp,
 }
 
 pub(crate) struct KeystrApp {
     pub model: KeystrModel,
     current_tab: Tab,
 }
+
+struct AppEventSink {}
 
 impl KeystrApp {
     pub fn new() -> Self {
@@ -431,7 +441,7 @@ impl KeystrApp {
                     ))
                     .size(15),
                     button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-                    button("DEBUG Refresh").on_press(Message::NoOp),
+                    button("DEBUG Refresh").on_press(Message::Refresh),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
@@ -526,18 +536,26 @@ impl KeystrApp {
     }
 }
 
-impl Sandbox for KeystrApp {
+impl Application for KeystrApp {
     type Message = Message;
+    type Theme = Theme;
+    type Executor = executor::Default;
+    type Flags = ();
 
-    fn new() -> Self {
-        KeystrApp::new()
+    fn new(_flags: ()) -> (Self, Command<Message>) {
+        (KeystrApp::new(), Command::none())
     }
 
     fn title(&self) -> String {
         String::from("Keystr")
     }
 
-    fn update(&mut self, message: Message) {
+    fn subscription(&self) -> Subscription<Message> {
+        // TODO: sample implementation: refresh every 5 secs
+        time::every(Duration::from_millis(5000)).map(|_| Message::Refresh)
+    }
+
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::TabSelect(t) => {
                 self.current_tab = t;
@@ -583,10 +601,32 @@ impl Sandbox for KeystrApp {
             Message::SignerUriInput(s) => self.model.signer.connect_uri_input = s,
             Message::ChangedReadonly(_s) => {}
             Message::NoOp => {}
+            Message::Refresh => {
+                // a message refreshes the UI, no extra action needed here
+            }
         }
+        Command::none()
     }
 
     fn view(&self) -> Element<Message> {
         self.view()
+    }
+}
+
+impl EventSink for AppEventSink {
+    fn handle_event(&mut self, event: &Event) {
+        // TODO proper handle, -> subscription
+        match event {
+            Event::SignerConnected => {
+                // TODO self.model.status.set("Event: Signer connected"),
+                println!("Event: Signer connected");
+            }
+            Event::SignerNewRequest => {
+                println!("Event: New Signer request");
+            }
+            Event::StatusUpdate => {
+                println!("Event: Status update");
+            }
+        }
     }
 }
