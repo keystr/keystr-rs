@@ -451,7 +451,7 @@ impl KeystrApp {
     fn view_dialog(&self, _confirm: &Confirmation) -> Element<Message> {
         container(
             column![
-                text("Remove exiting keys?").size(25),
+                text("Remove existing keys?").size(25),
                 row![
                     button("Yes").on_press(Message::ModelAction(Action::ConfirmationYes)),
                     button("No").on_press(Message::ModelAction(Action::ConfirmationNo)),

@@ -3,17 +3,17 @@
 - v0.9:
  - Nostr Connect support
 
-- [signer] Update UI on events in the bg
+- [signer, ui] Update UI on events in the bg
 - [signer] Connect/Disconnect is sync, can block UI (e.g. bad relay)
 - [signer] Show sig request in dialog
+- [signer] Support delegate
 - Key encryption pw: link entry to key entry (import, generate, etc.), and not save
 - [ui] Status: for error, show popup
 - Show QR code for keys (pub)
 - Relay support -- list, connect, query, send, etc.
-- Nostr Connect support
 - Make Copy button work (copy to clipboard)
 - Import mnemonic
-- [UI] Action to show more logs
+- [ui] Action to show more logs
 - [code org] move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
 - Multiple identities (main, etc.)

@@ -17,7 +17,7 @@ Written in Rust, with simple UI (Iced).
 ## Roadmap
 
 - Profile metadata
-- Remote Signer (NIP-46)
+- Android app
 
 ## Building and Running
 
