@@ -26,5 +26,7 @@ jobs:
         rustc --version
     - name: Build
       run: cargo build
-    - name: Running tests
+    - name: Run tests
       run: cargo test
+    - name: Check format
+      run: cargo fmt --check
