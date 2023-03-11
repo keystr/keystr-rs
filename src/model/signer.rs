@@ -74,10 +74,10 @@ impl Signer {
         });
 
         let handle = tokio::runtime::Handle::current();
-        let _ = relay_connect_blocking(connection.clone(), handle)?;
-        // Connected
+        // Connect in the background
+        let _ = relay_connect_async(connection.clone(), handle)?;
+        // Optimistic, TODO how is connection error propagated?
         self.connection = Some(connection);
-        EVENT_QUEUE.push(Event::SignerConnected)?;
         Ok(())
     }
 
@@ -278,6 +278,8 @@ async fn relay_connect(
     let msg = Message::request(Request::Connect(connect_id_keys.public_key()));
     let _ = send_message(&connection.relay_client, &msg, &connection.client_pubkey).await?;
 
+    EVENT_QUEUE.push(Event::SignerConnected)?;
+
     Ok(())
 }
 
@@ -286,6 +288,7 @@ async fn relay_disconnect(relay_client: Client) -> Result<(), Error> {
     Ok(())
 }
 
+/*
 fn relay_connect_blocking(connection: Arc<SignerConnection>, handle: Handle) -> Result<(), Error> {
     let (tx, rx) = channel::bounded(1);
     let connect_id_keys_clone = connection.app_id_keys.clone();
@@ -295,6 +298,17 @@ fn relay_connect_blocking(connection: Arc<SignerConnection>, handle: Handle) -> 
         let _ = tx.send(conn_res);
     });
     let _ = rx.recv()?;
+    Ok(())
+}
+*/
+
+/// Do connect in the bsckground
+fn relay_connect_async(connection: Arc<SignerConnection>, handle: Handle) -> Result<(), Error> {
+    let connect_id_keys_clone = connection.app_id_keys.clone();
+    let connection_clone = connection.clone();
+    handle.spawn(async move {
+        let _ = relay_connect(connection_clone, &connect_id_keys_clone).await;
+    });
     Ok(())
 }
 

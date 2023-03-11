@@ -208,10 +208,12 @@ impl KeystrModel {
         }
     }
 
+    /*
     /// Blocking wait for an event from the model
     pub fn get_event() -> Result<Event, Error> {
         EVENT_QUEUE.pop()
     }
+    */
 }
 
 impl EventQueue {
