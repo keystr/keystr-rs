@@ -145,11 +145,15 @@ impl KeystrModel {
                 .unlock_secret_key_action(&self.settings.security, &mut self.status),
             Action::ConfirmationYes => {
                 if let Some(Modal::Confirmation(conf)) = &self.modal {
-                    if let Confirmation::KeysClearBeforeAction(Some(next_action)) = conf {
-                        let prev_next_action = next_action.clone();
-                        self.modal = None;
-                        self.action(Action::KeysClearNoConfirm);
-                        self.action(prev_next_action);
+                    match conf {
+                        Confirmation::KeysClearBeforeAction(opt_next_action) => {
+                            let prev_next_action = opt_next_action.clone();
+                            self.modal = None;
+                            self.action(Action::KeysClearNoConfirm);
+                            if let Some(next_action) = prev_next_action {
+                                self.action(next_action);
+                            }
+                        }
                     }
                 }
             }
