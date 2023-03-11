@@ -54,9 +54,12 @@ pub enum Error {
     /// Signer is already connected, disconnect first
     #[error("Signer is already connected, disconnect first")]
     SignerAlreadyConnected,
-    /// Internal threading error
+    /// Internal event queue receive error
     #[error(transparent)]
-    ThreadingError(#[from] crossbeam::channel::RecvError),
+    InternalEventQueueReceive(#[from] crossbeam::channel::RecvError),
+    /// Internal event queue send error
+    #[error("Internal event queue send error")]
+    InternalEventQueueSend,
     /// Internal EventBuilder error
     #[error(transparent)]
     EventBuilderError(#[from] nostr::event::builder::Error),

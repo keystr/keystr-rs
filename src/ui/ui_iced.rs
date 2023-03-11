@@ -1,13 +1,10 @@
-use crate::model::keystr_model::{Action, Confirmation, Event, EventSink, KeystrModel, Modal};
+use crate::model::keystr_model::{Action, Confirmation, KeystrModel, Modal, EVENT_QUEUE};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
 
-use iced::executor;
-use iced::time;
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
+use iced::{executor, subscription};
 use iced::{Alignment, Application, Command, Element, Length, Subscription, Theme};
-
-use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -47,12 +44,10 @@ pub(crate) struct KeystrApp {
     current_tab: Tab,
 }
 
-struct AppEventSink {}
-
 impl KeystrApp {
     pub fn new() -> Self {
         Self {
-            model: KeystrModel::init(Some(Box::new(AppEventSink {}))),
+            model: KeystrModel::init(),
             current_tab: Tab::Keys,
         }
     }
@@ -536,6 +531,11 @@ impl KeystrApp {
     }
 }
 
+pub enum SubscriptionState {
+    Uninited,
+    Inited,
+}
+
 impl Application for KeystrApp {
     type Message = Message;
     type Theme = Theme;
@@ -551,8 +551,25 @@ impl Application for KeystrApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // TODO: sample implementation: refresh every 5 secs
-        time::every(Duration::from_millis(5000)).map(|_| Message::Refresh)
+        subscription::unfold(
+            std::any::TypeId::of::<KeystrModel>(),
+            SubscriptionState::Uninited,
+            move |state| async move {
+                match state {
+                    SubscriptionState::Uninited => (None, SubscriptionState::Inited),
+                    SubscriptionState::Inited => match EVENT_QUEUE.pop() {
+                        Err(e) => {
+                            println!("DEBUG: Subscription: error {:?}", e);
+                            (None, SubscriptionState::Inited)
+                        }
+                        Ok(event) => {
+                            println!("DEBUG: Subscription: Got event {:?}", event);
+                            (Some(Message::Refresh), SubscriptionState::Inited)
+                        }
+                    },
+                }
+            },
+        )
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -610,22 +627,5 @@ impl Application for KeystrApp {
 
     fn view(&self) -> Element<Message> {
         self.view()
-    }
-}
-
-impl EventSink for AppEventSink {
-    fn handle_event(&mut self, event: &Event) {
-        // TODO proper handle, -> subscription
-        match event {
-            Event::SignerConnected => {
-                // TODO self.model.status.set("Event: Signer connected"),
-                println!("Event: Signer connected");
-            }
-            Event::SignerNewRequest => {
-                println!("Event: New Signer request");
-            } // Event::StatusUpdate => {
-              //     println!("Event: Status update");
-              // }
-        }
     }
 }

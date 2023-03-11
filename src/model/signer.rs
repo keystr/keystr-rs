@@ -1,6 +1,6 @@
 use crate::base::error::Error;
 use crate::model::keystore::KeySigner;
-use crate::model::keystr_model::{Event, EventSinkWrapper};
+use crate::model::keystr_model::{Event, EVENT_QUEUE};
 use crate::model::status_messages::StatusMessages;
 
 use nostr::nips::nip46::{Message, Request};
@@ -20,7 +20,6 @@ pub(crate) struct Signer {
     #[readonly]
     connection: Option<Arc<SignerConnection>>,
     pub connect_uri_input: String,
-    event_sink: EventSinkWrapper,
 }
 
 /// Represents an active Nostr Connect connection
@@ -32,7 +31,6 @@ pub(crate) struct SignerConnection {
     pub relay_str: String,
     relay_client: Client,
     key_signer: KeySigner,
-    event_sink: EventSinkWrapper,
     /// Holds pending requests (mostly Sign requests), and can handle them
     requests: Mutex<Vec<SignatureReqest>>,
 }
@@ -44,21 +42,15 @@ pub(crate) struct SignatureReqest {
 }
 
 impl Signer {
-    pub fn new(app_id: &Keys, event_sink: EventSinkWrapper) -> Self {
+    pub fn new(app_id: &Keys) -> Self {
         Signer {
             app_id_keys: app_id.clone(),
             connection: None,
             connect_uri_input: String::new(),
-            event_sink,
         }
     }
 
-    fn connect(
-        &mut self,
-        uri_str: &str,
-        key_signer: &KeySigner,
-        event_sink: EventSinkWrapper,
-    ) -> Result<(), Error> {
+    fn connect(&mut self, uri_str: &str, key_signer: &KeySigner) -> Result<(), Error> {
         if self.connection.is_some() {
             return Err(Error::SignerAlreadyConnected);
         }
@@ -78,7 +70,6 @@ impl Signer {
             client_pubkey: connect_client_id_pubkey,
             app_id_keys: self.app_id_keys.clone(),
             key_signer: key_signer.clone(),
-            event_sink: event_sink.clone(),
             requests: Mutex::new(Vec::new()),
         });
 
@@ -86,7 +77,7 @@ impl Signer {
         let _ = relay_connect_blocking(connection.clone(), handle)?;
         // Connected
         self.connection = Some(connection);
-        event_sink.handle_event(&Event::SignerConnected);
+        EVENT_QUEUE.push(Event::SignerConnected)?;
         Ok(())
     }
 
@@ -101,7 +92,7 @@ impl Signer {
 
     pub fn connect_action(&mut self, key_signer: KeySigner, status: &mut StatusMessages) {
         let uri_input = self.connect_uri_input.clone();
-        match self.connect(&uri_input, &key_signer, self.event_sink.clone()) {
+        match self.connect(&uri_input, &key_signer) {
             Err(e) => status.set_error(&format!("Could not connect to relay: {}", e.to_string())),
             Ok(_) => status.set(&format!(
                 "Signer connected (relay: {}, client npub: {})",
@@ -400,7 +391,7 @@ async fn handle_request_message(
                 Request::SignEvent(_) => {
                     // This request needs user processing, store it, notify it
                     connection.add_request(msg.clone(), sender_pubkey.clone());
-                    connection.event_sink.handle_event(&Event::SignerNewRequest);
+                    EVENT_QUEUE.push(Event::SignerNewRequest)?;
                 }
                 _ => {
                     println!("DEBUG: Unhandled Request {:?}", msg.to_request());

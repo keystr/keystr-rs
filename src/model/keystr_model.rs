@@ -1,10 +1,14 @@
-use crate::model::{
-    delegator::Delegator, keystore::Keystore, settings::Settings, signer::Signer,
-    status_messages::StatusMessages,
-};
+use crate::base::error::Error;
+use crate::model::delegator::Delegator;
+use crate::model::keystore::Keystore;
+use crate::model::settings::Settings;
+use crate::model::signer::Signer;
+use crate::model::status_messages::StatusMessages;
+
 use nostr::prelude::Keys;
 
-use std::sync::{Arc, Mutex};
+use crossbeam::channel;
+use once_cell::sync::Lazy;
 
 /// Actions that can be triggerred from the UI
 #[derive(Clone, Debug)]
@@ -28,7 +32,7 @@ pub(crate) enum Action {
 }
 
 /// Events that can affect the UI
-/// #[derive(Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Event {
     SignerConnected,
     SignerNewRequest,
@@ -53,40 +57,40 @@ pub(crate) struct KeystrModel {
     pub signer: Signer,
     pub status: StatusMessages,
     pub settings: Settings,
-    event_sink: EventSinkWrapper,
     #[readonly]
     modal: Option<Modal>,
 }
 
+pub(crate) struct EventQueue {
+    sender: channel::Sender<Event>,
+    receiver: channel::Receiver<Event>,
+}
+
+/// Event queue used for getting events out from Model. A static instance is used.
+pub(crate) static EVENT_QUEUE: Lazy<EventQueue> = Lazy::new(|| EventQueue::new());
+
+// TODO remove
 /// Trait for someone who can consume our Events
 pub trait EventSink {
     fn handle_event(&mut self, event: &Event);
 }
 
-// Wrapper for event sink
-#[derive(Clone)]
-pub(crate) struct EventSinkWrapper {
-    event_sink: Option<Arc<Mutex<Box<dyn EventSink + Send>>>>,
-}
-
 impl KeystrModel {
-    pub fn new(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
+    pub fn new() -> Self {
         let app_id = Keys::generate();
-        let event_sink_wrapper = EventSinkWrapper::new(event_sink);
         Self {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
-            signer: Signer::new(&app_id, event_sink_wrapper.clone()),
+            signer: Signer::new(&app_id),
             status: StatusMessages::new(),
             settings: Settings::default(),
-            event_sink: event_sink_wrapper,
             modal: None,
         }
     }
 
     // Create and init model
-    pub fn init(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
-        let mut model = Self::new(event_sink);
+    pub fn init() -> Self {
+        let mut model = Self::new();
 
         model.status.set("Keystr starting");
         //. Try load settings
@@ -203,22 +207,28 @@ impl KeystrModel {
             }
         }
     }
+
+    /// Blocking wait for an event from the model
+    pub fn get_event() -> Result<Event, Error> {
+        EVENT_QUEUE.pop()
+    }
 }
 
-impl EventSinkWrapper {
-    fn new(event_sink: Option<Box<dyn EventSink + Send>>) -> Self {
-        EventSinkWrapper {
-            event_sink: match event_sink {
-                None => None,
-                Some(es) => Some(Arc::new(Mutex::new(es))),
-            },
-        }
+impl EventQueue {
+    fn new() -> Self {
+        let (sender, receiver) = channel::bounded::<Event>(100);
+        Self { sender, receiver }
     }
 
-    pub fn handle_event(&self, event: &Event) {
-        if let Some(es) = &self.event_sink {
-            es.lock().unwrap().handle_event(event);
-        }
+    pub fn push(&self, e: Event) -> Result<(), Error> {
+        self.sender
+            .send(e)
+            .map_err(|_e| Error::InternalEventQueueSend)
+    }
+
+    pub fn pop(&self) -> Result<Event, Error> {
+        let e = self.receiver.recv()?;
+        Ok(e)
     }
 }
 
@@ -228,7 +238,7 @@ mod test {
 
     #[test]
     fn test_clear_generate_confirmation() {
-        let mut m = KeystrModel::new(None);
+        let mut m = KeystrModel::new();
         assert_eq!(m.own_keys.keys_is_set(), false);
         assert!(m.modal.is_none());
 
