@@ -1,4 +1,4 @@
-use crate::model::keystr_model::{Action, Confirmation, KeystrModel, Modal, EVENT_QUEUE};
+use crate::model::keystr_model::{Action, Confirmation, Event, KeystrModel, Modal, EVENT_QUEUE};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::ui::dialog::Dialog;
 
@@ -17,6 +17,7 @@ pub enum Tab {
 pub(crate) enum Message {
     ChangedReadonly(String),
     ModelAction(Action),
+    ModelEvent(Event),
     NoOp,
     Refresh,
     SecurityLevelChange(SecurityLevel),
@@ -564,7 +565,7 @@ impl Application for KeystrApp {
                         }
                         Ok(event) => {
                             println!("DEBUG: Subscription: Got event {:?}", event);
-                            (Some(Message::Refresh), SubscriptionState::Inited)
+                            (Some(Message::ModelEvent(event)), SubscriptionState::Inited)
                         }
                     },
                 }
@@ -617,6 +618,9 @@ impl Application for KeystrApp {
             Message::SecurityLevelChange(l) => self.model.settings.set_security_level(l),
             Message::SignerUriInput(s) => self.model.signer.connect_uri_input = s,
             Message::ChangedReadonly(_s) => {}
+            Message::ModelEvent(_) => {
+                // just do a refresh, no extra action needed here
+            }
             Message::NoOp => {}
             Message::Refresh => {
                 // a message refreshes the UI, no extra action needed here
