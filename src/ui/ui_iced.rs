@@ -481,6 +481,7 @@ impl KeystrApp {
         container(match modal {
             Modal::Confirmation(Confirmation::KeysClearBeforeAction(_)) => column![
                 text("Remove existing keys?").size(25),
+                iced::widget::rule::Rule::horizontal(5),
                 row![
                     button("Yes").on_press(Message::ModelAction(Action::ConfirmationYes)),
                     button("No").on_press(Message::ModelAction(Action::ConfirmationNo)),
@@ -489,17 +490,30 @@ impl KeystrApp {
                 .width(Length::Fill)
                 .spacing(5)
                 .padding(0),
-                iced::widget::rule::Rule::horizontal(5),
             ]
             .align_items(Alignment::Fill)
             .width(Length::Fill)
             .spacing(5)
             .padding(20),
-            // _ => column![text("?").size(25)]
-            //     .align_items(Alignment::Fill)
-            //     .width(Length::Fill)
-            //     .spacing(5)
-            //     .padding(20),
+            Modal::SignerRequest(desc) => column![
+                text("Sign Request").size(25),
+                text("You have received a request to SIGN an event/post:").size(15),
+                text(desc).size(15),
+                iced::widget::rule::Rule::horizontal(5),
+                row![
+                    button("SIGN")
+                        .on_press(Message::ModelAction(Action::SignerPendingProcessFirst)),
+                    button("Ignore")
+                        .on_press(Message::ModelAction(Action::SignerPendingIgnoreFirst)),
+                    button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
+                ]
+                .spacing(5)
+                .padding(0)
+            ]
+            .align_items(Alignment::Fill)
+            .width(Length::Fill)
+            .spacing(5)
+            .padding(20),
         })
         .width(Length::Fixed(300.0))
         .padding(10)
@@ -543,7 +557,7 @@ impl KeystrApp {
         .height(Length::Fill)
         .into();
 
-        if let Some(modal) = &self.model.modal {
+        if let Some(modal) = &self.model.get_modal() {
             let dialog_content = self.view_dialog(modal);
 
             Dialog::new(main_content, dialog_content)

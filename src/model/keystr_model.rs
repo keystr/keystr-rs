@@ -2,7 +2,7 @@ use crate::base::error::Error;
 use crate::model::delegator::Delegator;
 use crate::model::keystore::Keystore;
 use crate::model::settings::Settings;
-use crate::model::signer::Signer;
+use crate::model::signer::{ConnectionStatus, Signer};
 use crate::model::status_messages::StatusMessages;
 
 use nostr::prelude::Keys;
@@ -43,6 +43,8 @@ pub enum Event {
 #[derive(Clone)]
 pub(crate) enum Modal {
     Confirmation(Confirmation),
+    /// An incoming signer request, including its description
+    SignerRequest(String),
 }
 
 #[derive(Clone)]
@@ -58,7 +60,7 @@ pub(crate) struct KeystrModel {
     pub status: StatusMessages,
     pub settings: Settings,
     #[readonly]
-    modal: Option<Modal>,
+    confirmation: Option<Confirmation>,
 }
 
 pub(crate) struct EventQueue {
@@ -84,7 +86,7 @@ impl KeystrModel {
             signer: Signer::new(&app_id),
             status: StatusMessages::new(),
             settings: Settings::default(),
-            modal: None,
+            confirmation: None,
         }
     }
 
@@ -122,20 +124,18 @@ impl KeystrModel {
             }
             Action::KeysClear => {
                 if self.own_keys.keys_is_set() {
-                    self.modal = Some(Modal::Confirmation(Confirmation::KeysClearBeforeAction(
-                        None,
-                    )));
+                    self.confirmation = Some(Confirmation::KeysClearBeforeAction(None));
                 } else {
                     self.action(Action::KeysClearNoConfirm);
                 }
             }
             Action::KeysGenerate => {
                 if self.own_keys.keys_is_set() {
-                    self.modal = Some(Modal::Confirmation(Confirmation::KeysClearBeforeAction(
-                        Some(Action::KeysGenerate),
+                    self.confirmation = Some(Confirmation::KeysClearBeforeAction(Some(
+                        Action::KeysGenerate,
                     )));
                 } else {
-                    self.modal = None;
+                    self.confirmation = None;
                     self.own_keys.generate();
                     self.status.set("New keypair generated");
                 }
@@ -156,9 +156,8 @@ impl KeystrModel {
             }
             Action::KeysLoad => {
                 if self.own_keys.keys_is_set() {
-                    self.modal = Some(Modal::Confirmation(Confirmation::KeysClearBeforeAction(
-                        Some(Action::KeysLoad),
-                    )));
+                    self.confirmation =
+                        Some(Confirmation::KeysClearBeforeAction(Some(Action::KeysLoad)));
                 } else {
                     self.own_keys
                         .load_action(&self.settings.security, &mut self.status);
@@ -172,11 +171,11 @@ impl KeystrModel {
                 .own_keys
                 .unlock_secret_key_action(&self.settings.security, &mut self.status),
             Action::ConfirmationYes => {
-                if let Some(Modal::Confirmation(conf)) = &self.modal {
+                if let Some(conf) = &self.confirmation {
                     match conf {
                         Confirmation::KeysClearBeforeAction(opt_next_action) => {
                             let prev_next_action = opt_next_action.clone();
-                            self.modal = None;
+                            self.confirmation = None;
                             self.action(Action::KeysClearNoConfirm);
                             if let Some(next_action) = prev_next_action {
                                 self.action(next_action);
@@ -186,8 +185,8 @@ impl KeystrModel {
                 }
             }
             Action::ConfirmationNo => {
-                if let Some(Modal::Confirmation(_conf)) = &self.modal {
-                    self.modal = None;
+                if let Some(_conf) = &self.confirmation {
+                    self.confirmation = None;
                 }
             }
             Action::SignerConnect => match self.own_keys.get_signer() {
@@ -205,6 +204,21 @@ impl KeystrModel {
             Action::SignerPendingProcessFirst => {
                 self.signer.pending_process_first_action(&mut self.status);
             }
+        }
+    }
+
+    /// Return the current modal dialog (operation for which user attention is needed)
+    pub fn get_modal(&self) -> Option<Modal> {
+        if let Some(conf) = &self.confirmation {
+            Some(Modal::Confirmation(conf.clone()))
+        } else if let ConnectionStatus::Connected(conn) = self.signer.get_connection_status() {
+            if conn.get_pending_count() > 0 {
+                Some(Modal::SignerRequest(conn.get_first_request_description()))
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 
@@ -242,36 +256,36 @@ mod test {
     fn test_clear_generate_confirmation() {
         let mut m = KeystrModel::new();
         assert_eq!(m.own_keys.keys_is_set(), false);
-        assert!(m.modal.is_none());
+        assert!(m.confirmation.is_none());
 
         // generate
         m.action(Action::KeysGenerate);
         assert_eq!(m.own_keys.keys_is_set(), true);
-        assert!(m.modal.is_none());
+        assert!(m.confirmation.is_none());
 
         // clear requires confirmation
         m.action(Action::KeysClear);
         assert_eq!(m.own_keys.keys_is_set(), true);
-        assert!(m.modal.is_some());
+        assert!(m.confirmation.is_some());
 
         // confirmation No does not change it
         m.action(Action::ConfirmationNo);
         assert_eq!(m.own_keys.keys_is_set(), true);
-        assert!(m.modal.is_none());
+        assert!(m.confirmation.is_none());
 
         // clear requires confirmation
         m.action(Action::KeysClear);
         assert_eq!(m.own_keys.keys_is_set(), true);
-        assert!(m.modal.is_some());
+        assert!(m.confirmation.is_some());
 
         // confirmation Yes performs clean
         m.action(Action::ConfirmationYes);
         assert_eq!(m.own_keys.keys_is_set(), false);
-        assert!(m.modal.is_none());
+        assert!(m.confirmation.is_none());
 
         // clear works now
         m.action(Action::KeysClear);
         assert_eq!(m.own_keys.keys_is_set(), false);
-        assert!(m.modal.is_none());
+        assert!(m.confirmation.is_none());
     }
 }
