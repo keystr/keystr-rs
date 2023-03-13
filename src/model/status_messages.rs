@@ -1,25 +1,32 @@
 use crate::base::error::Error;
+use crate::model::keystr_model::{Event, EVENT_QUEUE};
+
+use std::sync::{Arc, RwLock};
 
 const STATUS_MAX_LINES: usize = 10;
 
+#[derive(Clone)]
 pub(crate) struct StatusMessages {
-    status_lines: Vec<String>,
+    status_lines: Arc<RwLock<Vec<String>>>,
 }
 
 impl StatusMessages {
     pub fn new() -> Self {
         Self {
-            status_lines: Vec::new(),
+            status_lines: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
-    pub fn set(&mut self, s: &str) {
-        if self.status_lines.len() > STATUS_MAX_LINES {
-            self.status_lines.remove(0);
+    pub fn set(&self, s: &str) {
+        let mut lines = self.status_lines.write().unwrap();
+        if lines.len() > STATUS_MAX_LINES {
+            lines.remove(0);
         }
-        self.status_lines.push(s.to_string());
+        lines.push(s.to_string());
         // also print on stdout
         println!("| {}", s);
+        // also send UI notification
+        let _ = EVENT_QUEUE.push(Event::StatusUpdate);
     }
 
     pub fn set_error(&mut self, es: &str) {
@@ -35,10 +42,11 @@ impl StatusMessages {
     }
 
     pub fn get_last_n(&self, n: usize) -> String {
-        if self.status_lines.len() < n {
+        let lines = self.status_lines.read().unwrap();
+        if lines.len() < n {
             String::new()
         } else {
-            self.status_lines[self.status_lines.len() - n].clone()
+            lines[lines.len() - n].clone()
         }
     }
 }

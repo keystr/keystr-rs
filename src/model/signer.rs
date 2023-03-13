@@ -19,6 +19,7 @@ use tokio::runtime::Handle;
 #[readonly::make]
 pub(crate) struct Signer {
     app_id_keys: Keys,
+    status: StatusMessages,
     #[readonly]
     connection: Option<Arc<SignerConnection>>,
     pub connect_uri_input: String,
@@ -30,6 +31,7 @@ pub(crate) struct SignerConnection {
     pub client_pubkey: XOnlyPublicKey,
     // My client app ID, for the relays (not the one for signing)
     pub app_id_keys: Keys,
+    status: StatusMessages,
     pub relay_str: String,
     relay_client: Client,
     key_signer: KeySigner,
@@ -51,9 +53,10 @@ pub(crate) enum ConnectionStatus {
 }
 
 impl Signer {
-    pub fn new(app_id: &Keys) -> Self {
+    pub fn new(app_id: &Keys, status: StatusMessages) -> Self {
         Signer {
             app_id_keys: app_id.clone(),
+            status,
             connection: None,
             connect_uri_input: String::new(),
         }
@@ -77,6 +80,7 @@ impl Signer {
             relay_str: relay.to_string(),
             relay_client,
             client_pubkey: connect_client_id_pubkey,
+            status: self.status.clone(),
             app_id_keys: self.app_id_keys.clone(),
             key_signer: key_signer.clone(),
             requests: Mutex::new(Vec::new()),
@@ -103,11 +107,7 @@ impl Signer {
         let uri_input = self.connect_uri_input.clone();
         match self.connect(&uri_input, &key_signer) {
             Err(e) => status.set_error(&format!("Could not connect to relay: {}", e.to_string())),
-            Ok(_) => status.set(&format!(
-                "Signer connecting (relay: {}, client npub: {})",
-                &self.get_relay_str(),
-                &self.get_client_npub(),
-            )),
+            Ok(_) => status.set(&format!("Signer connecting...")),
         }
     }
 
@@ -154,6 +154,7 @@ impl Signer {
         }
     }
 
+    /*
     fn get_relay_str(&self) -> String {
         match &self.connection {
             Some(conn) => conn.relay_str.clone(),
@@ -168,6 +169,7 @@ impl Signer {
             "-".to_string()
         }
     }
+    */
 }
 
 impl SignerConnection {
@@ -334,6 +336,11 @@ async fn relay_connect(
     let _ = send_message(&connection.relay_client, &msg, &connection.client_pubkey).await?;
 
     EVENT_QUEUE.push(Event::SignerConnected)?;
+    connection.status.set(&format!(
+        "Signer connected (relay: {}, client npub: {})",
+        connection.relay_str,
+        connection.client_pubkey.to_bech32().unwrap(),
+    ));
 
     Ok(())
 }
@@ -461,6 +468,7 @@ async fn handle_request_message(
                     // This request needs user processing, store it, notify it
                     connection.add_request(msg.clone(), sender_pubkey.clone());
                     EVENT_QUEUE.push(Event::SignerNewRequest)?;
+                    connection.status.set("New Signing request received");
                 }
                 _ => {
                     println!("DEBUG: Unhandled Request {:?}", msg.to_request());

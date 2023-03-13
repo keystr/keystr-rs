@@ -36,7 +36,7 @@ pub(crate) enum Action {
 pub enum Event {
     SignerConnected,
     SignerNewRequest,
-    // StatusUpdate,
+    StatusUpdate,
 }
 
 /// Modal dialogs
@@ -80,11 +80,12 @@ pub trait EventSink {
 impl KeystrModel {
     pub fn new() -> Self {
         let app_id = Keys::generate();
+        let status = StatusMessages::new();
         Self {
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
-            signer: Signer::new(&app_id),
-            status: StatusMessages::new(),
+            signer: Signer::new(&app_id, status.clone()),
+            status,
             settings: Settings::default(),
             confirmation: None,
         }
