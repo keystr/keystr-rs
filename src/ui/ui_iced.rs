@@ -1,5 +1,6 @@
 use crate::model::keystr_model::{Action, Confirmation, Event, KeystrModel, Modal, EVENT_QUEUE};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
+use crate::model::signer::ConnectionStatus;
 use crate::ui::dialog::Dialog;
 
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
@@ -368,12 +369,12 @@ impl KeystrApp {
     }
 
     fn tab_signer(&self) -> Element<Message> {
-        let connection = &self.model.signer.connection;
+        let conn_status = &self.model.signer.get_connection_status();
 
-        let connection_content: Element<Message> = match connection {
-            None => {
+        let connection_content: Element<Message> = match conn_status {
+            ConnectionStatus::NotConnected => {
                 column![
-                    text("Status:  Not connected").size(15),
+                    text(format!("Status:  {}", "Not connected")).size(15),
                     text("Enter NostrConnect URI:").size(15),
                     row![
                         text_input(
@@ -389,13 +390,25 @@ impl KeystrApp {
                     .spacing(5)
                     .padding(0),
                     button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+                    button("Refresh").on_press(Message::Refresh),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
                 .padding(0)
                 .into()
             }
-            Some(conn) => {
+            ConnectionStatus::Connecting => {
+                column![
+                    text(format!("Status:  {}", "Connecting...")).size(15),
+                    button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
+                    button("Refresh").on_press(Message::Refresh),
+                ]
+                // .align_items(Alignment::Fill)
+                .spacing(5)
+                .padding(0)
+                .into()
+            }
+            ConnectionStatus::Connected(conn) => {
                 column![
                     if conn.get_pending_count() == 0 {
                         // No pending requests
@@ -437,7 +450,6 @@ impl KeystrApp {
                     ))
                     .size(15),
                     button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-                    button("DEBUG Refresh").on_press(Message::Refresh),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)

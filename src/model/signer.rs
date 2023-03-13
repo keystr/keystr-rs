@@ -5,7 +5,9 @@ use crate::model::status_messages::StatusMessages;
 
 use nostr::nips::nip46::{Message, Request};
 use nostr::prelude::{EventBuilder, Filter, Keys, Kind, NostrConnectURI, ToBech32, XOnlyPublicKey};
-use nostr_sdk::prelude::{decrypt, Client, Options, RelayPoolNotification, Response, Timestamp};
+use nostr_sdk::prelude::{
+    decrypt, Client, Options, RelayPoolNotification, RelayStatus, Response, Timestamp,
+};
 
 use crossbeam::channel;
 use std::str::FromStr;
@@ -41,6 +43,13 @@ pub(crate) struct SignatureReqest {
     sender_pubkey: XOnlyPublicKey,
 }
 
+/// Signer connection status: connected or not, or connection pending
+pub(crate) enum ConnectionStatus {
+    NotConnected,
+    Connecting,
+    Connected(Arc<SignerConnection>),
+}
+
 impl Signer {
     pub fn new(app_id: &Keys) -> Self {
         Signer {
@@ -51,7 +60,7 @@ impl Signer {
     }
 
     fn connect(&mut self, uri_str: &str, key_signer: &KeySigner) -> Result<(), Error> {
-        if self.connection.is_some() {
+        if let ConnectionStatus::Connected(_) = self.get_connection_status() {
             return Err(Error::SignerAlreadyConnected);
         }
 
@@ -95,7 +104,7 @@ impl Signer {
         match self.connect(&uri_input, &key_signer) {
             Err(e) => status.set_error(&format!("Could not connect to relay: {}", e.to_string())),
             Ok(_) => status.set(&format!(
-                "Signer connected (relay: {}, client npub: {})",
+                "Signer connecting (relay: {}, client npub: {})",
                 &self.get_relay_str(),
                 &self.get_client_npub(),
             )),
@@ -108,6 +117,25 @@ impl Signer {
             status.set("Signer disconnected");
         }
         self.connection = None;
+    }
+
+    pub fn get_connection_status(&self) -> ConnectionStatus {
+        match &self.connection {
+            None => ConnectionStatus::NotConnected,
+            Some(conn) => {
+                let (connected, connecting) = match conn.get_connected_count() {
+                    Err(_) => return ConnectionStatus::NotConnected,
+                    Ok(tupl) => tupl,
+                };
+                if connected > 0 {
+                    ConnectionStatus::Connected(conn.clone())
+                } else if connecting > 0 {
+                    ConnectionStatus::Connecting
+                } else {
+                    ConnectionStatus::NotConnected
+                }
+            }
+        }
     }
 
     pub fn pending_process_first_action(&mut self, status: &mut StatusMessages) {
@@ -198,8 +226,35 @@ impl SignerConnection {
         let _ = locked.remove(0);
     }
 
+    /// Remove the (first) pending request
     pub fn action_first_req_remove(&self) {
         let _ = self.requests.lock().unwrap().remove(0);
+    }
+
+    /// Get number of relays that are Connected / Connecting
+    pub async fn get_connected_count_bg(relay_client: &Client) -> (u32, u32) {
+        let relays = relay_client.relays().await;
+        let (mut cnt_cncted, mut cnt_cncting) = (0, 0);
+        for (_k, r) in relays {
+            match r.status().await {
+                RelayStatus::Connected => cnt_cncted = cnt_cncted + 1,
+                RelayStatus::Connecting => cnt_cncting = cnt_cncting + 1,
+                _ => (),
+            }
+        }
+        (cnt_cncted, cnt_cncting)
+    }
+
+    /// Get number of relays that are Connected / Connecting, blocking version
+    pub fn get_connected_count(&self) -> Result<(u32, u32), Error> {
+        let (tx, rx) = channel::bounded(1);
+        let relay_client_clone = self.relay_client.clone();
+        let handle = tokio::runtime::Handle::current();
+        handle.spawn(async move {
+            let count = Self::get_connected_count_bg(&relay_client_clone).await;
+            let _ = tx.send(count);
+        });
+        Ok(rx.recv()?)
     }
 }
 
