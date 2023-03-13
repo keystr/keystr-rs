@@ -1,9 +1,16 @@
-use crate::model::{
-    delegator::Delegator, keystore::Keystore, settings::Settings, signer::Signer,
-    status_messages::StatusMessages,
-};
+use crate::base::error::Error;
+use crate::model::delegator::Delegator;
+use crate::model::keystore::Keystore;
+use crate::model::settings::Settings;
+use crate::model::signer::Signer;
+use crate::model::status_messages::StatusMessages;
+
 use nostr::prelude::Keys;
 
+use crossbeam::channel;
+use once_cell::sync::Lazy;
+
+/// Actions that can be triggerred from the UI
 #[derive(Clone, Debug)]
 pub(crate) enum Action {
     DelegateDeeGenerate,
@@ -24,6 +31,14 @@ pub(crate) enum Action {
     SignerPendingProcessFirst,
 }
 
+/// Events that can affect the UI
+#[derive(Clone, Debug)]
+pub enum Event {
+    SignerConnected,
+    SignerNewRequest,
+    // StatusUpdate,
+}
+
 /// Modal dialogs
 #[derive(Clone)]
 pub(crate) enum Modal {
@@ -37,7 +52,6 @@ pub(crate) enum Confirmation {
 
 #[readonly::make]
 pub(crate) struct KeystrModel {
-    // app_id: Keys,
     pub own_keys: Keystore,
     pub delegator: Delegator,
     pub signer: Signer,
@@ -47,11 +61,24 @@ pub(crate) struct KeystrModel {
     modal: Option<Modal>,
 }
 
+pub(crate) struct EventQueue {
+    sender: channel::Sender<Event>,
+    receiver: channel::Receiver<Event>,
+}
+
+/// Event queue used for getting events out from Model. A static instance is used.
+pub(crate) static EVENT_QUEUE: Lazy<EventQueue> = Lazy::new(|| EventQueue::new());
+
+// TODO remove
+/// Trait for someone who can consume our Events
+pub trait EventSink {
+    fn handle_event(&mut self, event: &Event);
+}
+
 impl KeystrModel {
     pub fn new() -> Self {
         let app_id = Keys::generate();
         Self {
-            // app_id: app_id.clone(),
             own_keys: Keystore::new(),
             delegator: Delegator::new(),
             signer: Signer::new(&app_id),
@@ -64,7 +91,8 @@ impl KeystrModel {
     // Create and init model
     pub fn init() -> Self {
         let mut model = Self::new();
-        model.status.set("Keystr started");
+
+        model.status.set("Keystr starting");
         //. Try load settings
         if let Ok(sett) = Settings::load() {
             model.settings = sett;
@@ -178,6 +206,31 @@ impl KeystrModel {
                 self.signer.pending_process_first_action(&mut self.status);
             }
         }
+    }
+
+    /*
+    /// Blocking wait for an event from the model
+    pub fn get_event() -> Result<Event, Error> {
+        EVENT_QUEUE.pop()
+    }
+    */
+}
+
+impl EventQueue {
+    fn new() -> Self {
+        let (sender, receiver) = channel::bounded::<Event>(100);
+        Self { sender, receiver }
+    }
+
+    pub fn push(&self, e: Event) -> Result<(), Error> {
+        self.sender
+            .send(e)
+            .map_err(|_e| Error::InternalEventQueueSend)
+    }
+
+    pub fn pop(&self) -> Result<Event, Error> {
+        let e = self.receiver.recv()?;
+        Ok(e)
     }
 }
 

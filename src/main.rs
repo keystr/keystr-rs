@@ -3,7 +3,7 @@ mod model;
 mod ui;
 
 use crate::ui::ui_iced::KeystrApp;
-use iced::{Sandbox, Settings};
+use iced::{Application, Settings};
 
 #[tokio::main]
 async fn main() {

@@ -1,9 +1,11 @@
-use crate::model::keystr_model::{Action, Confirmation, KeystrModel, Modal};
+use crate::model::keystr_model::{Action, Confirmation, Event, KeystrModel, Modal, EVENT_QUEUE};
 use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
+use crate::model::signer::ConnectionStatus;
 use crate::ui::dialog::Dialog;
 
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
-use iced::{Alignment, Element, Length, Sandbox};
+use iced::{executor, subscription};
+use iced::{Alignment, Application, Command, Element, Length, Subscription, Theme};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tab {
@@ -14,24 +16,29 @@ pub enum Tab {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Message {
-    TabSelect(Tab),
+    ChangedReadonly(String),
     ModelAction(Action),
+    ModelEvent(Event),
+    NoOp,
+    Refresh,
+    SecurityLevelChange(SecurityLevel),
+    TabSelect(Tab),
+
     KeysPubkeyInput(String),
     KeysToggleHideSecretKey,
     KeysSecretkeyInput(String),
     KeysDecryptPasswordInput(String),
     KeysSavePasswordInput(String),
     KeysSaveRepeatPasswordInput(String),
+
     DelegateDeeChanged(String),
     DelegateKindChanged(String),
     DelegateTimeStartChanged(String),
     DelegateTimeEndChanged(String),
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
-    SecurityLevelChange(SecurityLevel),
+
     SignerUriInput(String),
-    ChangedReadonly(String),
-    NoOp,
 }
 
 pub(crate) struct KeystrApp {
@@ -362,12 +369,12 @@ impl KeystrApp {
     }
 
     fn tab_signer(&self) -> Element<Message> {
-        let connection = &self.model.signer.connection;
+        let conn_status = &self.model.signer.get_connection_status();
 
-        let connection_content: Element<Message> = match connection {
-            None => {
+        let connection_content: Element<Message> = match conn_status {
+            ConnectionStatus::NotConnected => {
                 column![
-                    text("Status:  Not connected").size(15),
+                    text(format!("Status:  {}", "Not connected")).size(15),
                     text("Enter NostrConnect URI:").size(15),
                     row![
                         text_input(
@@ -382,14 +389,35 @@ impl KeystrApp {
                     .align_items(Alignment::Center)
                     .spacing(5)
                     .padding(0),
-                    button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+                    row![
+                        button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+                        button("Refresh").on_press(Message::Refresh),
+                    ]
+                    .spacing(5)
+                    .padding(0),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
                 .padding(0)
                 .into()
             }
-            Some(conn) => {
+            ConnectionStatus::Connecting => {
+                column![
+                    text(format!("Status:  {}", "Connecting...")).size(15),
+                    row![
+                        button("Disconnect")
+                            .on_press(Message::ModelAction(Action::SignerDisconnect)),
+                        button("Refresh").on_press(Message::Refresh),
+                    ]
+                    .spacing(5)
+                    .padding(0),
+                ]
+                // .align_items(Alignment::Fill)
+                .spacing(5)
+                .padding(0)
+                .into()
+            }
+            ConnectionStatus::Connected(conn) => {
                 column![
                     if conn.get_pending_count() == 0 {
                         // No pending requests
@@ -414,6 +442,8 @@ impl KeystrApp {
                                     button("Ignore").on_press(Message::ModelAction(
                                         Action::SignerPendingIgnoreFirst
                                     )),
+                                    button("Disconnect")
+                                        .on_press(Message::ModelAction(Action::SignerDisconnect)),
                                 ]
                                 .spacing(5)
                                 .padding(0)
@@ -431,7 +461,6 @@ impl KeystrApp {
                     ))
                     .size(15),
                     button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-                    button("DEBUG Refresh").on_press(Message::NoOp),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
@@ -526,18 +555,48 @@ impl KeystrApp {
     }
 }
 
-impl Sandbox for KeystrApp {
-    type Message = Message;
+pub enum SubscriptionState {
+    Uninited,
+    Inited,
+}
 
-    fn new() -> Self {
-        KeystrApp::new()
+impl Application for KeystrApp {
+    type Message = Message;
+    type Theme = Theme;
+    type Executor = executor::Default;
+    type Flags = ();
+
+    fn new(_flags: ()) -> (Self, Command<Message>) {
+        (KeystrApp::new(), Command::none())
     }
 
     fn title(&self) -> String {
         String::from("Keystr")
     }
 
-    fn update(&mut self, message: Message) {
+    fn subscription(&self) -> Subscription<Message> {
+        subscription::unfold(
+            std::any::TypeId::of::<KeystrModel>(),
+            SubscriptionState::Uninited,
+            move |state| async move {
+                match state {
+                    SubscriptionState::Uninited => (None, SubscriptionState::Inited),
+                    SubscriptionState::Inited => match EVENT_QUEUE.pop() {
+                        Err(e) => {
+                            println!("DEBUG: Subscription: error {:?}", e);
+                            (None, SubscriptionState::Inited)
+                        }
+                        Ok(event) => {
+                            println!("DEBUG: Subscription: Got event {:?}", event);
+                            (Some(Message::ModelEvent(event)), SubscriptionState::Inited)
+                        }
+                    },
+                }
+            },
+        )
+    }
+
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::TabSelect(t) => {
                 self.current_tab = t;
@@ -582,8 +641,15 @@ impl Sandbox for KeystrApp {
             Message::SecurityLevelChange(l) => self.model.settings.set_security_level(l),
             Message::SignerUriInput(s) => self.model.signer.connect_uri_input = s,
             Message::ChangedReadonly(_s) => {}
+            Message::ModelEvent(_) => {
+                // just do a refresh, no extra action needed here
+            }
             Message::NoOp => {}
+            Message::Refresh => {
+                // a message refreshes the UI, no extra action needed here
+            }
         }
+        Command::none()
     }
 
     fn view(&self) -> Element<Message> {
