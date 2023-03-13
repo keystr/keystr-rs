@@ -9,6 +9,10 @@ Written in Rust, with simple UI (Iced).
   - Import of keys (secret or public)
   - Save/Load keys (encrypted with password)
 - Delegations: Create NIP-26 delegation
+- Signer (Nostr Connect) support:
+  - connect to a client (handle internal requests (describe, get public key))
+  - Show popup for handling incoming Sign requests
+
 
 ## Screenshot
 
@@ -73,6 +77,14 @@ Typical flow, assuming the a key pair is loaded:
 - Optionally enter an event type restriction, e.g. 'kind=1'
 - Create the delegation. The resulting delegation tag should be copied to the other client app.
 
+### NIP-46 Nostr Connect a.k.a Signer
+
+Keystr can act as a Signer, and sign event for a client.
+
+- Enter a nostrconnect URI string
+- Keystr will connect to the relay and listen for signer requests
+- For incoming Signing requests it shows a popup for the user, to review and acknowledge (sign) it
+
 
 ## Running Tests
 
@@ -88,6 +100,7 @@ Create an issue, PR, or discussion.
 
 - NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
 - NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
+- NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
 - Rust-nostr lib  https://github.com/rust-nostr/nostr
 - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
 - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
