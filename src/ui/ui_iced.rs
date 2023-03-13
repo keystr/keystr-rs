@@ -389,8 +389,12 @@ impl KeystrApp {
                     .align_items(Alignment::Center)
                     .spacing(5)
                     .padding(0),
-                    button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
-                    button("Refresh").on_press(Message::Refresh),
+                    row![
+                        button("Connect").on_press(Message::ModelAction(Action::SignerConnect)),
+                        button("Refresh").on_press(Message::Refresh),
+                    ]
+                    .spacing(5)
+                    .padding(0),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
@@ -400,8 +404,13 @@ impl KeystrApp {
             ConnectionStatus::Connecting => {
                 column![
                     text(format!("Status:  {}", "Connecting...")).size(15),
-                    button("Disconnect").on_press(Message::ModelAction(Action::SignerDisconnect)),
-                    button("Refresh").on_press(Message::Refresh),
+                    row![
+                        button("Disconnect")
+                            .on_press(Message::ModelAction(Action::SignerDisconnect)),
+                        button("Refresh").on_press(Message::Refresh),
+                    ]
+                    .spacing(5)
+                    .padding(0),
                 ]
                 // .align_items(Alignment::Fill)
                 .spacing(5)
@@ -433,6 +442,8 @@ impl KeystrApp {
                                     button("Ignore").on_press(Message::ModelAction(
                                         Action::SignerPendingIgnoreFirst
                                     )),
+                                    button("Disconnect")
+                                        .on_press(Message::ModelAction(Action::SignerDisconnect)),
                                 ]
                                 .spacing(5)
                                 .padding(0)
