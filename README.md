@@ -103,15 +103,15 @@ Nostr: optout@nostrplebs.com npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflsl
 ## References
 
 - Status:
- - NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
- - NIP-26 Status: https://nip26.lol
+  - NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
+  - NIP-26 Status: https://nip26.lol
 - Specs:
- - NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
- - NIP-46 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
-- Tools, clients
- - Rust-nostr lib  https://github.com/rust-nostr/nostr
- - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
-- General Nostr links
- - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
- - Nostr projects  https://github.com/aljazceru/awesome-nostr
+  - NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
+  - NIP-46 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
+- Tools, clients:
+  - Rust-nostr lib  https://github.com/rust-nostr/nostr
+  - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
+- General Nostr links:
+  - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
+  - Nostr projects  https://github.com/aljazceru/awesome-nostr
 
