@@ -89,7 +89,7 @@ impl Signer {
         let handle = tokio::runtime::Handle::current();
         // Connect in the background
         let _ = relay_connect_async(connection.clone(), handle)?;
-        // Optimistic, TODO how is connection error propagated?
+        // Optimistic
         self.connection = Some(connection);
         Ok(())
     }
@@ -364,7 +364,7 @@ fn relay_connect_blocking(connection: Arc<SignerConnection>, handle: Handle) -> 
 }
 */
 
-/// Do connect in the bsckground
+/// Do connect in the background
 fn relay_connect_async(connection: Arc<SignerConnection>, handle: Handle) -> Result<(), Error> {
     let connect_id_keys_clone = connection.app_id_keys.clone();
     let connection_clone = connection.clone();

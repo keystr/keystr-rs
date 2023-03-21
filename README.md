@@ -96,16 +96,22 @@ Create an issue, PR, or discussion.
 
 ## License: MIT
 
-## References
-
-- NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
-- NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
-- NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
-- Rust-nostr lib  https://github.com/rust-nostr/nostr
-- NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
-- Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
-- Nostr projects  https://github.com/aljazceru/awesome-nostr
-
 ## Contact
 
 Nostr: optout@nostrplebs.com npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflslh9jvqqd3lecx
+
+## References
+
+- Status:
+ - NIP-26 Delegations Status  https://hackmd.io/fskWGX_XRxG45fMrub8OiA?view
+ - NIP-26 Status: https://nip26.lol
+- Specs:
+ - NIP-26 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/26.md
+ - NIP-46 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
+- Tools, clients
+ - Rust-nostr lib  https://github.com/rust-nostr/nostr
+ - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
+- General Nostr links
+ - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol
+ - Nostr projects  https://github.com/aljazceru/awesome-nostr
+
