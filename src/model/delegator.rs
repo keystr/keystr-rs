@@ -125,7 +125,7 @@ impl Delegator {
 #[cfg(test)]
 mod test {
     use super::*;
-    use nostr::prelude::SecretKey;
+    use nostr::prelude::{DelegationTag, EventProperties, SecretKey};
 
     #[test]
     fn test_create_delegation() {
@@ -135,9 +135,9 @@ mod test {
         .unwrap();
         let keys = Keys::new(sk);
 
+        let delegatee_npub_str = "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez";
         let mut d = Delegator::new();
-        d.delegatee_npub_input =
-            "npub1h652adkpv4lr8k66cadg8yg0wl5wcc29z4lyw66m3rrwskcl4v6qr82xez".to_string();
+        d.delegatee_npub_input = delegatee_npub_str.to_string();
         d.kind_condition_input = "kind=1".to_string();
         d.time_cond_start = 1676067553.to_string();
         d.time_cond_end = 1678659553.to_string();
@@ -156,6 +156,49 @@ mod test {
         // validate tag
         let expected_tag = format!("[\"delegation\",\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\",\"kind=1&created_at>1676067553&created_at<1678659553\",\"{}\"]", d.signature);
         assert_eq!(d.delegation_tag, expected_tag);
+
+        // validate resulting delegation tag using upstream lib
+        {
+            let dtag = DelegationTag::from_str(&d.delegation_tag).unwrap();
+            assert!(dtag
+                .validate(
+                    XOnlyPublicKey::from_bech32(delegatee_npub_str).unwrap(),
+                    &EventProperties::new(1, 1676500000),
+                )
+                .is_ok());
+        }
+    }
+
+    #[test]
+    fn test_lib_dtag_validate() {
+        // nostr lib, tag validation
+        {
+            let tag_str = "[\"delegation\",\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\",\"kind=1&created_at>1676067553&created_at<1678659553\",\"369aed09c1ad52fceb77ecd6c16f2433eac4a3803fc41c58876a5b60f4f36b9493d5115e5ec5a0ce6c3668ffe5b58d47f2cbc97233833bb7e908f66dbbbd9d36\"]";
+            let delegatee_pubkey = XOnlyPublicKey::from_str(
+                "bea8aeb6c1657e33db5ac75a83910f77e8ec6145157e476b5b88c6e85b1fab34",
+            )
+            .unwrap();
+
+            let tag = DelegationTag::from_str(tag_str).unwrap();
+
+            assert!(tag
+                .validate(delegatee_pubkey, &EventProperties::new(1, 1677000000))
+                .is_ok());
+        }
+        // Uses non-default order of condition clauses, should not make a difference (see https://github.com/mikedilger/gossip/issues/375)
+        {
+            let tag_str = "[\"delegation\",\"05bc52a6117c57f99b73f5315f3105b21cecdcd2c6825dee8d508bd7d972ad6a\",\"kind=1&created_at<1686078180&created_at>1680807780\",\"1016d2f4284cdb4e6dc6eaa4e61dff87b9f4138786154d070d36e9434f817bd623abed2133bb62b9dcfb2fbf54b42e16bcd44cfc23907f8eb5b45c011caaa47c\"]";
+            let delegatee_pubkey = XOnlyPublicKey::from_str(
+                "111c02821806b046068dffc4d8e4de4a56bc99d3015c335b8929d900928fa317",
+            )
+            .unwrap();
+
+            let tag = DelegationTag::from_str(tag_str).unwrap();
+
+            assert!(tag
+                .validate(delegatee_pubkey, &EventProperties::new(1, 1680900000))
+                .is_ok());
+        }
     }
 
     #[test]
