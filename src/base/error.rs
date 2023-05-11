@@ -33,6 +33,12 @@ pub enum Error {
     /// Encryption passwords don't match
     #[error("Encryption passwords don't match")]
     KeyEncryptionPasswordMismatch,
+    /// Invalid BIP39 mnemonic
+    #[error(transparent)]
+    KeyMnemonic(#[from] bip39::Error),
+    /// BIP32 key derivation error
+    #[error(transparent)]
+    KeyDerivation(#[from] bip32::Error),
     /// Nip19 error
     #[error(transparent)]
     SignatureError(#[from] nostr::nips::nip19::Error),

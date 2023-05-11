@@ -27,6 +27,7 @@ pub(crate) enum Message {
     KeysPubkeyInput(String),
     KeysToggleHideSecretKey,
     KeysSecretkeyInput(String),
+    KeysMnemonicInput(String),
     KeysDecryptPasswordInput(String),
     KeysSavePasswordInput(String),
     KeysSaveRepeatPasswordInput(String),
@@ -210,6 +211,21 @@ impl KeystrApp {
                 .size(15),
                 button("Import Secret key")
                     .on_press(Message::ModelAction(Action::KeysImportSecretkey)),
+            ]
+            .align_items(Alignment::Fill)
+            .spacing(5)
+            .padding(0),
+            iced::widget::rule::Rule::horizontal(5),
+            row![
+                text_input(
+                    "BIP39 mnemonic (passphrase) to generate secret key, NIP-06",
+                    &self.model.own_keys.mnemonic_input,
+                    Message::KeysMnemonicInput,
+                )
+                .password()
+                .size(15),
+                button("Import Mnemonic")
+                    .on_press(Message::ModelAction(Action::KeysImportMnemonic)),
             ]
             .align_items(Alignment::Fill)
             .spacing(5)
@@ -623,6 +639,7 @@ impl Application for KeystrApp {
                 self.model.own_keys.hide_secret_key = !self.model.own_keys.hide_secret_key
             }
             Message::KeysSecretkeyInput(s) => self.model.own_keys.secret_key_input = s,
+            Message::KeysMnemonicInput(s) => self.model.own_keys.mnemonic_input = s,
             Message::KeysDecryptPasswordInput(s) => self.model.own_keys.decrypt_password_input = s,
             Message::KeysSavePasswordInput(s) => self.model.own_keys.save_password_input = s,
             Message::KeysSaveRepeatPasswordInput(s) => {
