@@ -20,6 +20,7 @@ pub(crate) enum Action {
     KeysGenerate,
     KeysImportPubkey,
     KeysImportSecretkey,
+    KeysImportMnemonic,
     KeysLoad,
     KeysSave,
     KeysUnlock,
@@ -154,6 +155,9 @@ impl KeystrModel {
             }
             Action::KeysImportSecretkey => {
                 self.own_keys.import_secret_key_action(&mut self.status);
+            }
+            Action::KeysImportMnemonic => {
+                self.own_keys.import_mnemonic_action(&mut self.status);
             }
             Action::KeysLoad => {
                 if self.own_keys.keys_is_set() {
