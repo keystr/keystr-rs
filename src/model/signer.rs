@@ -73,7 +73,7 @@ impl Signer {
 
         // Create relay client, but don't connect it yet
         let opts = Options::new().wait_for_send(true);
-        let relay_client = Client::new_with_opts(&self.app_id_keys, opts);
+        let relay_client = Client::with_opts(&self.app_id_keys, opts);
 
         let connection = Arc::new(SignerConnection {
             // uri: uri.clone(),
@@ -451,7 +451,11 @@ async fn handle_request_message(
             match req {
                 Request::Describe => {
                     println!("DEBUG: Describe received");
-                    let values = serde_json::json!(["describe", "get_public_key", "sign_event"]);
+                    let values = ["describe", "get_public_key", "sign_event"]
+                        .to_vec()
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect();
                     let response_msg = Message::response(id.clone(), Response::Describe(values));
                     let _ = send_message(relay_client, &response_msg, sender_pubkey).await?;
                 }
