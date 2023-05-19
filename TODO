@@ -4,7 +4,6 @@
 
 - Key encryption pw: link entry to key entry (import, generate, etc.), and not save
 - [ui] Status: for error, show popup/toast
-- Show QR code for keys (pub)
 - Relay support -- list, connect, query, send, etc.
 - Make Copy button work (copy to clipboard)
 - Import mnemonic

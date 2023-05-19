@@ -3,6 +3,7 @@ use crate::model::security_settings::{SecurityLevel, SECURITY_LEVELS};
 use crate::model::signer::ConnectionStatus;
 use crate::ui::dialog::Dialog;
 
+use iced::widget::qr_code::QRCode;
 use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{executor, subscription};
 use iced::{Alignment, Application, Command, Element, Length, Subscription, Theme};
@@ -38,6 +39,8 @@ pub(crate) enum Message {
     DelegateTimeDaysChanged(String),
     DelegateTimeDaysChangedNoUpdate(String),
 
+    QRCode(String),
+    QRCodeClose,
     SignerUriInput(String),
 }
 
@@ -99,6 +102,7 @@ impl KeystrApp {
                     .align_items(Alignment::Start)
                     .width(label_width)
                     .padding(0),
+                button("QR").on_press(Message::QRCode(self.model.own_keys.get_npub())),
                 text_input(
                     "npub public key",
                     &self.model.own_keys.get_npub(),
@@ -495,6 +499,18 @@ impl KeystrApp {
             .width(Length::Fill)
             .spacing(5)
             .padding(20),
+
+            Modal::QRCode(qr_content) => column![
+                text("QR Code").size(25),
+                QRCode::new(&self.model.get_qr_code().as_ref().unwrap().1).cell_size(6),
+                text(qr_content).size(15),
+                button("Close").on_press(Message::QRCodeClose),
+            ]
+            .align_items(Alignment::Fill)
+            .width(Length::Fill)
+            .spacing(5)
+            .padding(20),
+
             Modal::SignerRequest(desc) => column![
                 text("Sign Request").size(25),
                 text("You have received a request to SIGN an event/post:").size(15),
@@ -658,6 +674,8 @@ impl Application for KeystrApp {
             Message::ModelEvent(_) => {
                 // just do a refresh, no extra action needed here
             }
+            Message::QRCode(qr_content) => self.model.set_qr_code(qr_content),
+            Message::QRCodeClose => self.model.reset_qr_code(),
             Message::NoOp => {}
             Message::Refresh => {
                 // a message refreshes the UI, no extra action needed here

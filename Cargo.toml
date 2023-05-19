@@ -18,7 +18,7 @@ chacha20poly1305 = "0.10.1"
 crossbeam = "0.8.2"
 dirs = "4.0.0"
 hex = "0.4.3"
-iced = { version = "0.8.0", features = ["tokio"]}
+iced = { version = "0.8.0", features = ["tokio", "qr_code"]}
 iced_native = "0.9.1"
 nostr = "0.21.0"
 nostr-sdk = "0.21.0"

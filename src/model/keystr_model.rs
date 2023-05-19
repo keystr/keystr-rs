@@ -8,6 +8,7 @@ use crate::model::status_messages::StatusMessages;
 use nostr::prelude::Keys;
 
 use crossbeam::channel;
+use iced::widget::qr_code;
 use once_cell::sync::Lazy;
 
 /// Actions that can be triggerred from the UI
@@ -42,7 +43,10 @@ pub enum Event {
 /// Modal dialogs
 #[derive(Clone)]
 pub(crate) enum Modal {
+    /// A simple confirmation dialog
     Confirmation(Confirmation),
+    /// Show a QR code in a dialog
+    QRCode(String),
     /// An incoming signer request, including its description
     SignerRequest(String),
 }
@@ -61,6 +65,9 @@ pub(crate) struct KeystrModel {
     pub settings: Settings,
     #[readonly]
     confirmation: Option<Confirmation>,
+    // QR code content; State must be stored somewhere outside of the UI
+    #[readonly]
+    qr_code: Option<(String, qr_code::State)>,
 }
 
 pub(crate) struct EventQueue {
@@ -88,6 +95,7 @@ impl KeystrModel {
             status,
             settings: Settings::default(),
             confirmation: None,
+            qr_code: None,
         }
     }
 
@@ -218,9 +226,28 @@ impl KeystrModel {
             } else {
                 None
             }
+        } else if let Some((qr_content, _qr_code)) = &self.qr_code {
+            Some(Modal::QRCode(qr_content.clone()))
         } else {
             None
         }
+    }
+
+    /// Open QR dialog, set content
+    pub fn set_qr_code(&mut self, qr_content: String) {
+        self.qr_code = if let Ok(qr_code) = qr_code::State::new(qr_content.clone().as_bytes()) {
+            Some((qr_content, qr_code))
+        } else {
+            None
+        };
+    }
+
+    pub fn reset_qr_code(&mut self) {
+        self.qr_code = None;
+    }
+
+    pub fn get_qr_code(&self) -> &Option<(String, qr_code::State)> {
+        &self.qr_code
     }
 
     /*
