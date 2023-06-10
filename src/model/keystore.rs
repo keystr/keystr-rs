@@ -9,7 +9,7 @@ use nostr::secp256k1::schnorr::Signature;
 
 use std::fs;
 
-// Model for KeyStore part
+/// Model for KeyStore part
 #[readonly::make]
 pub(crate) struct Keystore {
     #[readonly]
@@ -17,15 +17,17 @@ pub(crate) struct Keystore {
     keys: Option<Keys>,
     encrypted_secret_key: Option<Vec<u8>>,
     pub hide_secret_key: bool,
-    // Input for public key import
+    /// Input for public key import
     pub public_key_input: String,
-    // Input for secret key import
+    /// Input for secret key import
     pub secret_key_input: String,
-    // Input for encryption password, for decrypt
+    /// Input for BIP39 mnemonic
+    pub mnemonic_input: String,
+    /// Input for encryption password, for decrypt
     pub decrypt_password_input: String,
-    // Input for encryption password, for save
+    /// Input for encryption password, for save
     pub save_password_input: String,
-    // Input for repeat encryption password, for save
+    /// Input for repeat encryption password, for save
     pub save_repeat_password_input: String,
 }
 
@@ -38,6 +40,7 @@ impl Keystore {
             hide_secret_key: true,
             public_key_input: String::new(),
             secret_key_input: String::new(),
+            mnemonic_input: String::new(),
             decrypt_password_input: String::new(),
             save_password_input: String::new(),
             save_repeat_password_input: String::new(),
@@ -101,6 +104,23 @@ impl Keystore {
         };
         let sk = Encrypt::decrypt_key(&sk_bytes, &password)?;
         self.import_secret_key(&sk.to_bech32()?, false)
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Import secret key from BIP39 mnemonic
+    pub fn import_mnemonic(&mut self, mnemonic: &str, is_changed: bool) -> Result<(), Error> {
+        let mnemonic = bip39::Mnemonic::parse(mnemonic)?;
+        let password = "".to_string();
+        let seed = mnemonic.to_seed(password);
+        let account = 0;
+        let derivation_path = format!("m/44'/1237'/{account}'/0/0");
+        let child_xprv = bip32::XPrv::derive_from_path(&seed, &derivation_path.parse()?)?;
+        let private_key = child_xprv.private_key();
+        let secret_key = SecretKey::from_slice(&private_key.to_bytes())?;
+        self.clear();
+        self.keys = Some(Keys::new(secret_key));
+        self.has_unsaved_change = is_changed;
+        Ok(())
     }
 
     /// Warning: Security-sensitive method!
@@ -189,7 +209,7 @@ impl Keystore {
     }
 
     /// Warning: Security-sensitive method!
-    ///.Action to save secret key from file
+    ///.Action to save secret key to file
     pub fn save_action(
         &mut self,
         security_settings: &SecuritySettings,
@@ -275,6 +295,19 @@ impl Keystore {
         };
         // cleanup
         self.secret_key_input = String::new();
+    }
+
+    /// Warning: Security-sensitive method!
+    /// Import secret key from BIP39 mnemonic
+    pub fn import_mnemonic_action(&mut self, status: &mut StatusMessages) {
+        match self.import_mnemonic(&self.mnemonic_input.clone(), true) {
+            Err(e) => {
+                status.set_error(&format!("Error importing from mnemonic, {}", e.to_string()))
+            }
+            Ok(_) => status.set("Secret key imported from mnemonic"),
+        };
+        // cleanup
+        self.mnemonic_input = String::new();
     }
 
     pub fn get_signer(&self) -> Result<KeySigner, Error> {
@@ -487,5 +520,24 @@ mod test {
         assert!(res.is_err());
         assert_eq!(k.is_public_key_set(), false);
         assert_eq!(k.is_secret_key_set(), false);
+    }
+
+    #[test]
+    fn test_import_mnemonic() {
+        let mut k = Keystore::new();
+        let _res = k
+            .import_mnemonic("oil oil oil oil oil oil oil oil oil oil oil oil", true)
+            .unwrap();
+        assert!(k.is_public_key_set());
+        assert!(k.is_secret_key_set());
+        assert_eq!(
+            k.get_npub(),
+            "npub1tczgvlwvcdxp5f4mp8rqehramx6dqemq6v8egf3qdfzazn8cs7dqlhmwux"
+        );
+        k.hide_secret_key = false;
+        assert_eq!(
+            k.get_nsec(),
+            "nsec16awa8nftexjs4nk8zfl5wrrtc6a7hhycj7p8ztlf4dfy5xa9dcnslmfkz5"
+        );
     }
 }
