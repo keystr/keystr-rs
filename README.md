@@ -22,6 +22,7 @@ Written in Rust, with simple UI (Iced).
 
 - Profile metadata
 - Android app
+- FROST support
 
 ## Building and Running
 

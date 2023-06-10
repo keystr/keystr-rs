@@ -11,3 +11,4 @@
 - [code org] move module part to separate module (later separate crate)
 - Mnemonic support (generate, derive)
 - Multiple identities (main, etc.)
+- FROST support
