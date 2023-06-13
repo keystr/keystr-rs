@@ -29,7 +29,7 @@ pub(crate) struct Signer {
 pub(crate) struct SignerConnection {
     // uri: NostrConnectURI,
     pub client_pubkey: XOnlyPublicKey,
-    // My client app ID, for the relays (not the one for signing)
+    /// My client app ID, for the relays (not the one for signing)
     pub app_id_keys: Keys,
     status: StatusMessages,
     pub relay_str: String,
@@ -425,8 +425,7 @@ async fn wait_and_handle_messages(connection: Arc<SignerConnection>) -> Result<(
                     match decrypt(&keys.secret_key()?, &event.pubkey, &event.content) {
                         Ok(msg) => {
                             let msg = Message::from_json(msg)?;
-                            let _ = handle_request_message(connection.clone(), &msg, &event.pubkey)
-                                .await?;
+                            let _ = handle_request(connection.clone(), &msg, &event.pubkey).await?;
                         }
                         Err(e) => eprintln!("DEBUG: Impossible to decrypt NIP46 message: {e}"),
                     }
@@ -437,47 +436,64 @@ async fn wait_and_handle_messages(connection: Arc<SignerConnection>) -> Result<(
     // relay_client.unsubscribe().await;
 }
 
-async fn handle_request_message(
+fn response_for_message(req_id: &String, req: &Request, key_signer: &KeySigner) -> Option<Message> {
+    match req {
+        Request::Describe => {
+            println!("DEBUG: Describe received");
+            let values = ["describe", "get_public_key", "sign_event"]
+                .to_vec()
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            Some(Message::response(
+                req_id.to_string(),
+                Response::Describe(values),
+            ))
+        }
+        Request::GetPublicKey => {
+            // Return the signer pubkey
+            println!("DEBUG: GetPublicKey received");
+            Some(Message::response(
+                req_id.clone(),
+                Response::GetPublicKey(key_signer.get_public_key()),
+            ))
+        }
+        Request::SignEvent(_) | _ => None,
+    }
+}
+
+async fn handle_request(
     connection: Arc<SignerConnection>,
     msg: &Message,
     sender_pubkey: &XOnlyPublicKey,
 ) -> Result<(), Error> {
     println!("DEBUG: New message received {}", message_method(msg));
-    let relay_client = &connection.relay_client;
-    let key_signer = &connection.key_signer;
 
     if let Message::Request { id, .. } = msg {
         if let Ok(req) = &msg.to_request() {
-            match req {
-                Request::Describe => {
-                    println!("DEBUG: Describe received");
-                    let values = ["describe", "get_public_key", "sign_event"]
-                        .to_vec()
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect();
-                    let response_msg = Message::response(id.clone(), Response::Describe(values));
-                    let _ = send_message(relay_client, &response_msg, sender_pubkey).await?;
+            let key_signer = &connection.key_signer;
+            let response_message = response_for_message(id, req, key_signer);
+            match response_message {
+                Some(m) => {
+                    // We return a response message right away
+                    let relay_client = &connection.relay_client;
+                    let _ = send_message(relay_client, &m, sender_pubkey).await?;
                 }
-                Request::GetPublicKey => {
-                    // Return the signer pubkey
-                    println!("DEBUG: GetPublicKey received");
-                    let response_msg = Message::response(
-                        id.clone(),
-                        Response::GetPublicKey(key_signer.get_public_key()),
-                    );
-                    let _ = send_message(relay_client, &response_msg, sender_pubkey).await?;
+                None => {
+                    // Cannot return a response message right away, other handling needed
+                    match req {
+                        Request::SignEvent(_) => {
+                            // This request needs user processing, store it, notify it
+                            connection.add_request(msg.clone(), sender_pubkey.clone());
+                            EVENT_QUEUE.push(Event::SignerNewRequest)?;
+                            connection.status.set("New Signing request received");
+                        }
+                        _ => {
+                            println!("DEBUG: Unhandled Request {:?}", msg.to_request());
+                        }
+                    }
                 }
-                Request::SignEvent(_) => {
-                    // This request needs user processing, store it, notify it
-                    connection.add_request(msg.clone(), sender_pubkey.clone());
-                    EVENT_QUEUE.push(Event::SignerNewRequest)?;
-                    connection.status.set("New Signing request received");
-                }
-                _ => {
-                    println!("DEBUG: Unhandled Request {:?}", msg.to_request());
-                }
-            };
+            }
         } else {
             println!("DEBUG: Could not extract Request, ignoring");
         }
@@ -485,4 +501,38 @@ async fn handle_request_message(
         println!("DEBUG: Not a Request, ignoring");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::{response_for_message, KeySigner, Keys, Request};
+    use nostr::prelude::{FromBech32, SecretKey};
+
+    const NSEC1: &str = "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae";
+
+    #[test]
+    fn test_response_for_message_describe() {
+        let req_id: String = "id001".to_string();
+        let req: Request = Request::Describe;
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        assert!(resp_msg.is_some());
+        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":[\"describe\",\"get_public_key\",\"sign_event\"]}");
+    }
+
+    #[test]
+    fn test_response_for_message_getpublickey() {
+        let req_id: String = "id001".to_string();
+        let req: Request = Request::GetPublicKey;
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        assert!(resp_msg.is_some());
+        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\"}");
+    }
 }

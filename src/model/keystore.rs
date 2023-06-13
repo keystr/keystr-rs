@@ -382,7 +382,7 @@ impl Keystore {
 /// Can sign a hash with its own secret key
 #[derive(Clone)]
 pub(crate) struct KeySigner {
-    keys: Keys,
+    pub keys: Keys,
 }
 
 impl KeySigner {
