@@ -505,15 +505,16 @@ async fn handle_request(
 
 #[cfg(test)]
 mod test {
-    use super::{response_for_message, KeySigner, Keys, Request};
-    use nostr::prelude::{FromBech32, SecretKey};
+    use super::{response_for_message, KeySigner, Keys, Request, XOnlyPublicKey};
+    use nostr::prelude::{Conditions, FromBech32, SecretKey};
 
-    const NSEC1: &str = "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae";
+    const NSEC1: &str = "nsec1lfeqz504rd4hc824kmts9qkl5qz7t9md694cd3vr5zevmpne5weqp2thmp";
+    const NPUB2: &str = "npub1c82zv3aj04l8dmxlxywx5fsg6ngt5nyvwa9j0eqk03ntg2t2jtxqngn7ry";
 
     #[test]
     fn test_response_for_message_describe() {
-        let req_id: String = "id001".to_string();
         let req: Request = Request::Describe;
+        let req_id: String = "id001".to_string();
         let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
         let key_signer: KeySigner = KeySigner {
             keys: Keys::new(sk),
@@ -525,14 +526,34 @@ mod test {
 
     #[test]
     fn test_response_for_message_getpublickey() {
-        let req_id: String = "id001".to_string();
         let req: Request = Request::GetPublicKey;
+        let req_id: String = "id001".to_string();
         let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
         let key_signer: KeySigner = KeySigner {
             keys: Keys::new(sk),
         };
         let resp_msg = response_for_message(&req_id, &req, &key_signer);
         assert!(resp_msg.is_some());
-        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\"}");
+        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"dd73f1d141b01badbb4049c5bcaa2cd261501c0c356774fada3db425c7d6e413\"}");
+    }
+
+    // TODO: add (negative) test for SignEvent
+
+    #[test]
+    fn test_response_for_message_delegate() {
+        let delegatee_pubkey = XOnlyPublicKey::from_bech32(NPUB2).unwrap();
+        let conditions: Conditions = Conditions::default();
+        let req: Request = Request::Delegate {
+            public_key: delegatee_pubkey,
+            conditions,
+        };
+        let req_id: String = "id001".to_string();
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        assert!(resp_msg.is_none());
+        // assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\"}");
     }
 }
