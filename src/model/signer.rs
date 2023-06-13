@@ -207,20 +207,25 @@ impl SignerConnection {
             if let Message::Request { id, .. } = &req.req {
                 if let Ok(request) = &req.req.to_request() {
                     match request {
-                        Request::SignEvent(unsigned_event) => {
-                            let unsigned_id = unsigned_event.id;
-                            if let Ok(signature) =
-                                self.key_signer.sign(unsigned_id.as_bytes().to_vec())
+                        Request::SignEvent(_unsigned_event) => {
+                            if let Ok(resp_opt) =
+                                response_for_message(id, request, &self.key_signer)
                             {
-                                let response_msg =
-                                    Message::response(id.clone(), Response::SignEvent(signature));
-                                let _ = send_message_blocking(
-                                    &self.relay_client,
-                                    &response_msg,
-                                    &req.sender_pubkey,
-                                    tokio::runtime::Handle::current(),
-                                );
+                                if let Some(response_msg) = resp_opt {
+                                    let _ = send_message_blocking(
+                                        &self.relay_client,
+                                        &response_msg,
+                                        &req.sender_pubkey,
+                                        tokio::runtime::Handle::current(),
+                                    );
+                                }
                             }
+                        }
+                        Request::Delegate {
+                            public_key: _,
+                            conditions: _,
+                        } => {
+                            // TODO
                         }
                         // ignore other requests
                         _ => {}
