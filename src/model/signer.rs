@@ -502,3 +502,37 @@ async fn handle_request(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use super::{response_for_message, KeySigner, Keys, Request};
+    use nostr::prelude::{FromBech32, SecretKey};
+
+    const NSEC1: &str = "nsec1ktekw0hr5evjs0n9nyyquz4sue568snypy2rwk5mpv6hl2hq3vtsk0kpae";
+
+    #[test]
+    fn test_response_for_message_describe() {
+        let req_id: String = "id001".to_string();
+        let req: Request = Request::Describe;
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        assert!(resp_msg.is_some());
+        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":[\"describe\",\"get_public_key\",\"sign_event\"]}");
+    }
+
+    #[test]
+    fn test_response_for_message_getpublickey() {
+        let req_id: String = "id001".to_string();
+        let req: Request = Request::GetPublicKey;
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        assert!(resp_msg.is_some());
+        assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\"}");
+    }
+}
