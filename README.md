@@ -8,10 +8,10 @@ Written in Rust, with simple UI (Iced).
 - Safekeeping of keys:
   - Import of keys (secret or public)
   - Save/Load keys (encrypted with password)
-- Delegations: Create NIP-26 delegation
-- Signer (Nostr Connect) support:
-  - connect to a client (handle internal requests (describe, get public key))
-  - Show popup for handling incoming Sign requests
+- Delegations (NIP-26): Create delegation
+- Signer (NIP-46 Nostr Connect) support:
+  - connect to a client (handle internal requests (describe, get_public_key))
+  - handling incoming sign_event and delegate requests, requiring user confirmation (via a popup)
 
 
 ## Screenshot
@@ -20,8 +20,8 @@ Written in Rust, with simple UI (Iced).
 
 ## Roadmap
 
-- Profile metadata
 - Android app
+- Profile metadata (show, edit)
 - FROST support
 
 ## Building and Running
@@ -82,9 +82,21 @@ Typical flow, assuming the a key pair is loaded:
 
 Keystr can act as a Signer, and sign event for a client.
 
-- Enter a nostrconnect URI string
+- Initiate a connection in the client app (to obtain a nostrconnect URI)
+- Enter a nostrconnect URI string in Keystr
 - Keystr will connect to the relay and listen for signer requests
 - For incoming Signing requests it shows a popup for the user, to review and acknowledge (sign) it
+
+### NIP-46 + NIP+26 Signer and Delegation combined
+
+Keystr as a Signer can sign a delegation, simplifying the communication to get the delegation tag to the app.
+
+- Initiate a connection in the client app (to obtain a nostrconnect URI)
+- Enter a nostrconnect URI string in Keystr
+- From the client app request a delegation (recommended to limit validity to short period, and the kinds to the kinds used by the app)
+- In Keystr review the request, confirm
+- Delegation tag is automatically sent to the client app, the client app can post using it right away
+- App can re-request the delegation as the current one expires (may not need to reconnect)
 
 
 ## Running Tests
@@ -99,7 +111,7 @@ Create an issue, PR, or discussion.
 
 ## Contact
 
-Nostr: optout@nostrplebs.com npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflslh9jvqqd3lecx
+Nostr: optout@nostrplebs.com  `nostr:npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflslh9jvqqd3lecx`
 
 ## References
 
@@ -111,6 +123,7 @@ Nostr: optout@nostrplebs.com npub1kxgpwh80gp79j0chc925srk6rghw0akggduwau8fwdflsl
   - NIP-46 Delegations Spec https://github.com/nostr-protocol/nips/blob/master/46.md
 - Tools, clients:
   - Rust-nostr lib  https://github.com/rust-nostr/nostr
+  - Nostr Connect demo  https://github.com/catenocrypt/nostr-connect-demo
   - NostrTool, key generation and delegation playground  https://github.com/kdmukai/nostrtool
 - General Nostr links:
   - Nostr Protocol definition  https://github.com/nostr-protocol/nostr  protocol

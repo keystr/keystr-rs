@@ -4,7 +4,10 @@ use crate::model::keystr_model::{Event, EVENT_QUEUE};
 use crate::model::status_messages::StatusMessages;
 
 use nostr::nips::nip46::{Message, Request};
-use nostr::prelude::{EventBuilder, Filter, Keys, Kind, NostrConnectURI, ToBech32, XOnlyPublicKey};
+use nostr::prelude::{
+    DelegationResult, DelegationTag, EventBuilder, Filter, Keys, Kind, NostrConnectURI, ToBech32,
+    XOnlyPublicKey,
+};
 use nostr_sdk::prelude::{
     decrypt, Client, Options, RelayPoolNotification, RelayStatus, Response, Timestamp,
 };
@@ -204,19 +207,35 @@ impl SignerConnection {
             if let Message::Request { id, .. } = &req.req {
                 if let Ok(request) = &req.req.to_request() {
                     match request {
-                        Request::SignEvent(unsigned_event) => {
-                            let unsigned_id = unsigned_event.id;
-                            if let Ok(signature) =
-                                self.key_signer.sign(unsigned_id.as_bytes().to_vec())
+                        Request::SignEvent(_unsigned_event) => {
+                            if let Ok(resp_opt) =
+                                response_for_message(id, request, &self.key_signer)
                             {
-                                let response_msg =
-                                    Message::response(id.clone(), Response::SignEvent(signature));
-                                let _ = send_message_blocking(
-                                    &self.relay_client,
-                                    &response_msg,
-                                    &req.sender_pubkey,
-                                    tokio::runtime::Handle::current(),
-                                );
+                                if let Some(response_msg) = resp_opt {
+                                    let _ = send_message_blocking(
+                                        &self.relay_client,
+                                        &response_msg,
+                                        &req.sender_pubkey,
+                                        tokio::runtime::Handle::current(),
+                                    );
+                                }
+                            }
+                        }
+                        Request::Delegate {
+                            public_key: _,
+                            conditions: _,
+                        } => {
+                            if let Ok(resp_opt) =
+                                response_for_message(id, request, &self.key_signer)
+                            {
+                                if let Some(response_msg) = resp_opt {
+                                    let _ = send_message_blocking(
+                                        &self.relay_client,
+                                        &response_msg,
+                                        &req.sender_pubkey,
+                                        tokio::runtime::Handle::current(),
+                                    );
+                                }
                             }
                         }
                         // ignore other requests
@@ -279,6 +298,16 @@ impl SignatureReqest {
                     format!(
                         "Signature requested for message: '{}'",
                         shortened_text(&unsigned_event.content, PREVIEW_CONTENT_LEN)
+                    )
+                }
+                Request::Delegate {
+                    public_key,
+                    conditions,
+                } => {
+                    format!(
+                        "Delegation requested, for pubkey '{}', with conditions '{}'",
+                        public_key.to_bech32().unwrap_or_default(),
+                        conditions.to_string()
                     )
                 }
                 _ => format!("({}, no action needed)", req.method()),
@@ -436,7 +465,13 @@ async fn wait_and_handle_messages(connection: Arc<SignerConnection>) -> Result<(
     // relay_client.unsubscribe().await;
 }
 
-fn response_for_message(req_id: &String, req: &Request, key_signer: &KeySigner) -> Option<Message> {
+/// Put together response message for a request
+/// Ok(None) is a valid return value
+fn response_for_message(
+    req_id: &String,
+    req: &Request,
+    key_signer: &KeySigner,
+) -> Result<Option<Message>, Error> {
     match req {
         Request::Describe => {
             println!("DEBUG: Describe received");
@@ -445,20 +480,45 @@ fn response_for_message(req_id: &String, req: &Request, key_signer: &KeySigner) 
                 .iter()
                 .map(|s| s.to_string())
                 .collect();
-            Some(Message::response(
+            Ok(Some(Message::response(
                 req_id.to_string(),
                 Response::Describe(values),
-            ))
+            )))
         }
         Request::GetPublicKey => {
             // Return the signer pubkey
             println!("DEBUG: GetPublicKey received");
-            Some(Message::response(
+            Ok(Some(Message::response(
                 req_id.clone(),
                 Response::GetPublicKey(key_signer.get_public_key()),
-            ))
+            )))
         }
-        Request::SignEvent(_) | _ => None,
+        Request::SignEvent(unsigned_event) => {
+            let unsigned_id = unsigned_event.id;
+            let signature = key_signer.sign(unsigned_id.as_bytes().to_vec())?;
+            Ok(Some(Message::response(
+                req_id.clone(),
+                Response::SignEvent(signature),
+            )))
+        }
+        Request::Delegate {
+            public_key,
+            conditions,
+        } => {
+            let delegation_tag =
+                DelegationTag::new(&key_signer.keys, public_key.clone(), conditions.clone())?;
+            let delegator_result = DelegationResult {
+                from: key_signer.get_public_key(),
+                to: public_key.clone(),
+                cond: conditions.clone(),
+                sig: delegation_tag.signature(),
+            };
+            Ok(Some(Message::response(
+                req_id.clone(),
+                Response::Delegate(delegator_result),
+            )))
+        }
+        _ => Ok(None),
     }
 }
 
@@ -471,25 +531,37 @@ async fn handle_request(
 
     if let Message::Request { id, .. } = msg {
         if let Ok(req) = &msg.to_request() {
-            let key_signer = &connection.key_signer;
-            let response_message = response_for_message(id, req, key_signer);
-            match response_message {
-                Some(m) => {
-                    // We return a response message right away
-                    let relay_client = &connection.relay_client;
-                    let _ = send_message(relay_client, &m, sender_pubkey).await?;
+            match req {
+                // First handle requests that need user interaction
+                Request::SignEvent(_) => {
+                    // This request needs user processing, store it, notify it
+                    connection.add_request(msg.clone(), sender_pubkey.clone());
+                    EVENT_QUEUE.push(Event::SignerNewRequest)?;
+                    connection.status.set("New Signing request received");
                 }
-                None => {
-                    // Cannot return a response message right away, other handling needed
-                    match req {
-                        Request::SignEvent(_) => {
-                            // This request needs user processing, store it, notify it
-                            connection.add_request(msg.clone(), sender_pubkey.clone());
-                            EVENT_QUEUE.push(Event::SignerNewRequest)?;
-                            connection.status.set("New Signing request received");
+                Request::Delegate {
+                    public_key: _,
+                    conditions: _,
+                } => {
+                    // This request needs user processing, store it, notify it
+                    connection.add_request(msg.clone(), sender_pubkey.clone());
+                    EVENT_QUEUE.push(Event::SignerNewRequest)?;
+                    connection
+                        .status
+                        .set("New Signing/Delegate request received");
+                }
+                _ => {
+                    // Non-interactive requests: try to create response, send it
+                    let key_signer = &connection.key_signer;
+                    let response_message = response_for_message(id, req, key_signer)?;
+                    match response_message {
+                        Some(m) => {
+                            // We return a response message right away
+                            let relay_client = &connection.relay_client;
+                            let _ = send_message(relay_client, &m, sender_pubkey).await?;
                         }
-                        _ => {
-                            println!("DEBUG: Unhandled Request {:?}", msg.to_request());
+                        None => {
+                            println!("ERROR: Could not handle request {:?}", msg.to_request());
                         }
                     }
                 }
@@ -506,10 +578,14 @@ async fn handle_request(
 #[cfg(test)]
 mod test {
     use super::{response_for_message, KeySigner, Keys, Request, XOnlyPublicKey};
-    use nostr::prelude::{Conditions, FromBech32, SecretKey};
+    use nostr::prelude::{
+        Condition, Conditions, EventId, FromBech32, KeyPair, Secp256k1, SecretKey, Timestamp,
+        UnsignedEvent,
+    };
 
     const NSEC1: &str = "nsec1lfeqz504rd4hc824kmts9qkl5qz7t9md694cd3vr5zevmpne5weqp2thmp";
     const NPUB2: &str = "npub1c82zv3aj04l8dmxlxywx5fsg6ngt5nyvwa9j0eqk03ntg2t2jtxqngn7ry";
+    const EVENTHEX: &str = "0b1c1aa42d25eab6f022febcea00e858b034f73ac4229aa82554b8cb3d8f94f5";
 
     #[test]
     fn test_response_for_message_describe() {
@@ -519,7 +595,7 @@ mod test {
         let key_signer: KeySigner = KeySigner {
             keys: Keys::new(sk),
         };
-        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        let resp_msg = response_for_message(&req_id, &req, &key_signer).unwrap();
         assert!(resp_msg.is_some());
         assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":[\"describe\",\"get_public_key\",\"sign_event\"]}");
     }
@@ -532,17 +608,61 @@ mod test {
         let key_signer: KeySigner = KeySigner {
             keys: Keys::new(sk),
         };
-        let resp_msg = response_for_message(&req_id, &req, &key_signer);
+        let resp_msg = response_for_message(&req_id, &req, &key_signer).unwrap();
         assert!(resp_msg.is_some());
         assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"dd73f1d141b01badbb4049c5bcaa2cd261501c0c356774fada3db425c7d6e413\"}");
     }
 
-    // TODO: add (negative) test for SignEvent
+    #[test]
+    fn test_response_for_message_signevent() {
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let (pubkey, _parity) =
+            XOnlyPublicKey::from_keypair(&KeyPair::from_secret_key(&Secp256k1::default(), &sk));
+        let unisgned_event: UnsignedEvent = UnsignedEvent {
+            id: EventId::from_hex(EVENTHEX).unwrap(),
+            pubkey,
+            created_at: Timestamp::from(1686693500),
+            kind: nostr::Kind::TextNote,
+            tags: vec![],
+            content: "Hello, World!".to_string(),
+        };
+        let req: Request = Request::SignEvent(unisgned_event);
+        let req_id: String = "id001".to_string();
+        let sk: SecretKey = SecretKey::from_bech32(NSEC1).unwrap();
+        let key_signer: KeySigner = KeySigner {
+            keys: Keys::new(sk),
+        };
+        let resp_msg = response_for_message(&req_id, &req, &key_signer).unwrap();
+        assert!(resp_msg.is_some());
+        // Cannot compare json, as signature changes
+        assert_eq!(resp_msg.as_ref().unwrap().is_request(), false);
+        match resp_msg.unwrap() {
+            nostr::nips::nip46::Message::Response { id, result, error } => {
+                assert_eq!(id, "id001");
+                assert!(error.is_none());
+                assert!(result.is_some());
+                match result.as_ref().unwrap() {
+                    serde_json::Value::String(s) => {
+                        // sig changes, cannot compare to constant, check only length
+                        assert_eq!(s.len(), 128);
+                    }
+                    _ => {
+                        panic!("Wrong result value")
+                    }
+                }
+            }
+            _ => {
+                panic!("Wrong response")
+            }
+        }
+    }
 
     #[test]
     fn test_response_for_message_delegate() {
         let delegatee_pubkey = XOnlyPublicKey::from_bech32(NPUB2).unwrap();
-        let conditions: Conditions = Conditions::default();
+        let mut conditions: Conditions = Conditions::default();
+        conditions.add(Condition::Kind(1));
+        conditions.add(Condition::CreatedBefore(1686693500));
         let req: Request = Request::Delegate {
             public_key: delegatee_pubkey,
             conditions,
@@ -552,8 +672,38 @@ mod test {
         let key_signer: KeySigner = KeySigner {
             keys: Keys::new(sk),
         };
-        let resp_msg = response_for_message(&req_id, &req, &key_signer);
-        assert!(resp_msg.is_none());
-        // assert_eq!(resp_msg.unwrap().as_json(), "{\"error\":null,\"id\":\"id001\",\"result\":\"1a459a8a6aa6441d480ba665fb8fb21a4cfe8bcacb7d87300f8046a558a3fce4\"}");
+        let resp_msg = response_for_message(&req_id, &req, &key_signer).unwrap();
+        assert!(resp_msg.is_some());
+        // Cannot compare json, as signature changes
+        assert_eq!(resp_msg.as_ref().unwrap().is_request(), false);
+        match resp_msg.unwrap() {
+            nostr::nips::nip46::Message::Response { id, result, error } => {
+                assert_eq!(id, "id001");
+                assert!(error.is_none());
+                assert!(result.is_some());
+                match result.as_ref().unwrap() {
+                    serde_json::Value::Object(o) => {
+                        assert_eq!(o["cond"].to_string(), "\"kind=1&created_at<1686693500\"");
+                        assert_eq!(
+                            o["from"].to_string(),
+                            "\"dd73f1d141b01badbb4049c5bcaa2cd261501c0c356774fada3db425c7d6e413\""
+                        );
+                        assert_eq!(
+                            o["to"].to_string(),
+                            "\"c1d42647b27d7e76ecdf311c6a2608d4d0ba4c8c774b27e4167c66b4296a92cc\""
+                        );
+                        // sig changes, cannot compare to constant, check only length
+                        let siglen = o["sig"].to_string().len();
+                        assert!(siglen > 128 && siglen < 132);
+                    }
+                    _ => {
+                        panic!("Wrong result value")
+                    }
+                }
+            }
+            _ => {
+                panic!("Wrong response")
+            }
+        }
     }
 }
