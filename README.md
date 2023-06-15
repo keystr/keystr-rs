@@ -96,6 +96,7 @@ Keystr as a Signer can sign a delegation, simplifying the communication to get t
 - From the client app request a delegation (recommended to limit validity to short period, and the kinds to the kinds used by the app)
 - In Keystr review the request, confirm
 - Delegation tag is automatically sent to the client app, the client app can post using it right away
+- App can re-request the delegation as the current one expires (may not need to reconnect)
 
 
 ## Running Tests

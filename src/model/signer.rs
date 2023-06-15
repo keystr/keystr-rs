@@ -657,8 +657,6 @@ mod test {
         }
     }
 
-    // TODO: add (negative) test for SignEvent
-
     #[test]
     fn test_response_for_message_delegate() {
         let delegatee_pubkey = XOnlyPublicKey::from_bech32(NPUB2).unwrap();
