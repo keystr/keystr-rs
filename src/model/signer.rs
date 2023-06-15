@@ -225,7 +225,18 @@ impl SignerConnection {
                             public_key: _,
                             conditions: _,
                         } => {
-                            // TODO
+                            if let Ok(resp_opt) =
+                                response_for_message(id, request, &self.key_signer)
+                            {
+                                if let Some(response_msg) = resp_opt {
+                                    let _ = send_message_blocking(
+                                        &self.relay_client,
+                                        &response_msg,
+                                        &req.sender_pubkey,
+                                        tokio::runtime::Handle::current(),
+                                    );
+                                }
+                            }
                         }
                         // ignore other requests
                         _ => {}
@@ -287,6 +298,16 @@ impl SignatureReqest {
                     format!(
                         "Signature requested for message: '{}'",
                         shortened_text(&unsigned_event.content, PREVIEW_CONTENT_LEN)
+                    )
+                }
+                Request::Delegate {
+                    public_key,
+                    conditions,
+                } => {
+                    format!(
+                        "Delegation requested, for pubkey '{}', with conditions '{}'",
+                        public_key.to_bech32().unwrap_or_default(),
+                        conditions.to_string()
                     )
                 }
                 _ => format!("({}, no action needed)", req.method()),
@@ -522,10 +543,12 @@ async fn handle_request(
                     public_key: _,
                     conditions: _,
                 } => {
-                    // TODO
+                    // This request needs user processing, store it, notify it
+                    connection.add_request(msg.clone(), sender_pubkey.clone());
+                    EVENT_QUEUE.push(Event::SignerNewRequest)?;
                     connection
                         .status
-                        .set("New Delegate request received, NOT SUPPORTED TODO");
+                        .set("New Signing/Delegate request received");
                 }
                 _ => {
                     // Non-interactive requests: try to create response, send it
